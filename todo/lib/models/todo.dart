@@ -7,7 +7,8 @@ class Todo {
   DateTime? updatedAt;
   DateTime? dueDate;
   String priority; // 'low', 'medium', 'high'
-  String category;
+  String? voiceNotePath; // Path to voice note file
+  Duration? voiceNoteDuration; // Duration of voice note
 
   Todo({
     required this.id,
@@ -18,7 +19,8 @@ class Todo {
     this.updatedAt,
     this.dueDate,
     this.priority = 'medium',
-    this.category = 'general',
+    this.voiceNotePath,
+    this.voiceNoteDuration,
   });
 
   // Convert Todo to Map (similar to MongoDB document)
@@ -32,7 +34,8 @@ class Todo {
       'updatedAt': updatedAt?.toIso8601String(),
       'dueDate': dueDate?.toIso8601String(),
       'priority': priority,
-      'category': category,
+      'voiceNotePath': voiceNotePath,
+      'voiceNoteDuration': voiceNoteDuration?.inMilliseconds,
     };
   }
 
@@ -49,7 +52,10 @@ class Todo {
           : null,
       dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null,
       priority: map['priority'] ?? 'medium',
-      category: map['category'] ?? 'general',
+      voiceNotePath: map['voiceNotePath'],
+      voiceNoteDuration: map['voiceNoteDuration'] != null
+          ? Duration(milliseconds: map['voiceNoteDuration'])
+          : null,
     );
   }
 
@@ -63,7 +69,8 @@ class Todo {
     DateTime? updatedAt,
     DateTime? dueDate,
     String? priority,
-    String? category,
+    String? voiceNotePath,
+    Duration? voiceNoteDuration,
   }) {
     return Todo(
       id: id ?? this.id,
@@ -74,13 +81,25 @@ class Todo {
       updatedAt: updatedAt ?? this.updatedAt,
       dueDate: dueDate ?? this.dueDate,
       priority: priority ?? this.priority,
-      category: category ?? this.category,
+      voiceNotePath: voiceNotePath ?? this.voiceNotePath,
+      voiceNoteDuration: voiceNoteDuration ?? this.voiceNoteDuration,
     );
+  }
+
+  // Check if todo has voice note
+  bool get hasVoiceNote => voiceNotePath != null && voiceNotePath!.isNotEmpty;
+
+  // Get formatted voice note duration
+  String get formattedVoiceNoteDuration {
+    if (voiceNoteDuration == null) return '';
+    final minutes = voiceNoteDuration!.inMinutes;
+    final seconds = voiceNoteDuration!.inSeconds % 60;
+    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
   }
 
   @override
   String toString() {
-    return 'Todo{id: $id, title: $title, isCompleted: $isCompleted}';
+    return 'Todo{id: $id, title: $title, isCompleted: $isCompleted, hasVoiceNote: $hasVoiceNote}';
   }
 
   @override

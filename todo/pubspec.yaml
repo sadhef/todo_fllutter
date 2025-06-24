@@ -1,5 +1,5 @@
 name: todo
-description: "A comprehensive Flutter todo application with advanced features."
+description: "A comprehensive Flutter todo application with voice notes and notifications."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -12,6 +12,19 @@ dependencies:
     sdk: flutter
   provider: ^6.1.1
   cupertino_icons: ^1.0.8
+  
+  # Voice recording and playback - COMPATIBLE PACKAGES
+  audio_waveforms: ^1.0.5
+  audioplayers: ^4.1.0
+  path_provider: ^2.1.2
+  permission_handler: ^10.4.5
+  
+  # Notifications
+  flutter_local_notifications: ^15.1.2
+  timezone: ^0.9.2
+  
+  # File handling
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:

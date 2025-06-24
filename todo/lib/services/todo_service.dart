@@ -23,16 +23,12 @@ class TodoService {
   // Get todos by filter (GET /api/todos?filter=...)
   Future<List<Todo>> getTodosByFilter({
     bool? isCompleted,
-    String? category,
     String? priority,
   }) async {
     await Future.delayed(_delay);
 
     return _todos.where((todo) {
       if (isCompleted != null && todo.isCompleted != isCompleted) {
-        return false;
-      }
-      if (category != null && todo.category != category) {
         return false;
       }
       if (priority != null && todo.priority != priority) {
@@ -128,8 +124,7 @@ class TodoService {
     final lowerQuery = query.toLowerCase();
     return _todos.where((todo) {
       return todo.title.toLowerCase().contains(lowerQuery) ||
-          todo.description.toLowerCase().contains(lowerQuery) ||
-          todo.category.toLowerCase().contains(lowerQuery);
+          todo.description.toLowerCase().contains(lowerQuery);
     }).toList();
   }
 
@@ -142,11 +137,9 @@ class TodoService {
     final pending = total - completed;
 
     final byPriority = <String, int>{};
-    final byCategory = <String, int>{};
 
     for (final todo in _todos) {
       byPriority[todo.priority] = (byPriority[todo.priority] ?? 0) + 1;
-      byCategory[todo.category] = (byCategory[todo.category] ?? 0) + 1;
     }
 
     return {
@@ -155,7 +148,6 @@ class TodoService {
       'pending': pending,
       'completionRate': total > 0 ? completed / total : 0.0,
       'byPriority': byPriority,
-      'byCategory': byCategory,
     };
   }
 

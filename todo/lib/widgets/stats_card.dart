@@ -122,28 +122,39 @@ class StatsCard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Category breakdown
-                if (stats['byCategory'] != null) ...[
+                // Additional stats
+                if (stats['todosWithVoiceNotes'] != null) ...[
                   Text(
-                    'By Category',
+                    'Additional Stats',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: (stats['byCategory'] as Map<String, dynamic>)
-                        .entries
-                        .map(
-                          (entry) => _buildCategoryChip(
-                            context,
-                            entry.key,
-                            entry.value.toString(),
-                          ),
-                        )
-                        .toList(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatItem(
+                          context,
+                          'Voice Notes',
+                          stats['todosWithVoiceNotes']?.toString() ?? '0',
+                          Icons.mic,
+                          AppTheme.accentColor,
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildStatItem(
+                          context,
+                          'Overdue',
+                          stats['overdueTodos']?.toString() ?? '0',
+                          Icons.warning,
+                          AppTheme.errorColor,
+                        ),
+                      ),
+                      const Expanded(
+                        child: SizedBox(),
+                      ), // Empty space for alignment
+                    ],
                   ),
                 ],
               ],
@@ -264,58 +275,6 @@ class StatsCard extends StatelessWidget {
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: color),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryChip(
-    BuildContext context,
-    String category,
-    String count,
-  ) {
-    final color = AppTheme.getCategoryColor(category);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            category,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              count,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
           ),
         ],
       ),
