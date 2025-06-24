@@ -1,54 +1,83 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Pink feminine color palette
+  // Primary color palette - improved for better contrast
   static const Color primaryColor = Color(0xFFE91E63); // Pink
   static const Color secondaryColor = Color(0xFFF06292); // Light Pink
   static const Color accentColor = Color(0xFFAD1457); // Dark Pink
-  static const Color errorColor = Color(0xFFF06292);
+  static const Color errorColor = Color(0xFFD32F2F); // Better red for errors
   static const Color warningColor = Color(0xFFFF9800);
   static const Color successColor = Color(0xFF4CAF50);
 
-  // Priority colors - pink themed
-  static const Color lowPriority = Color(0xFFC8E6C9); // Light Green
-  static const Color mediumPriority = Color(0xFFFFE0B2); // Light Orange
-  static const Color highPriority = Color(0xFFFFCDD2); // Light Red
+  // Priority colors - improved visibility
+  static const Color lowPriority = Color(0xFF4CAF50); // Green
+  static const Color mediumPriority = Color(0xFFFF9800); // Orange
+  static const Color highPriority = Color(0xFFE91E63); // Pink/Red
 
-  // Additional pink shades
+  // Additional color shades
   static const Color lightPink = Color(0xFFFCE4EC);
   static const Color mediumPink = Color(0xFFF8BBD9);
   static const Color darkPink = Color(0xFF880E4F);
   static const Color softPink = Color(0xFFF48FB1);
 
+  // Text colors for better readability
+  static const Color darkText = Color(0xFF1A1A1A);
+  static const Color lightText = Color(0xFFFFFFFF);
+  static const Color mediumText = Color(0xFF666666);
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.light,
       colorScheme: const ColorScheme.light(
         primary: primaryColor,
         secondary: secondaryColor,
         surface: Color(0xFFFFFBFF),
-        background: lightPink,
+        background: Color(0xFFFAFAFA),
         error: errorColor,
-        onPrimary: Colors.white,
-        onSecondary: Colors.white,
-        onSurface: darkPink,
-        onBackground: darkPink,
-        onError: Colors.white,
+        onPrimary: lightText,
+        onSecondary: lightText,
+        onSurface: darkText,
+        onBackground: darkText,
+        onError: lightText,
         tertiary: softPink,
       ),
 
       // AppBar theme
       appBarTheme: const AppBarTheme(
         backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        foregroundColor: lightText,
         elevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w700,
-          color: Colors.white,
+          color: lightText,
           letterSpacing: 0.5,
         ),
+        iconTheme: IconThemeData(color: lightText),
+      ),
+
+      // Text theme with better contrast
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(color: darkText, fontWeight: FontWeight.bold),
+        displayMedium: TextStyle(color: darkText, fontWeight: FontWeight.bold),
+        displaySmall: TextStyle(color: darkText, fontWeight: FontWeight.bold),
+        headlineLarge: TextStyle(color: darkText, fontWeight: FontWeight.w600),
+        headlineMedium: TextStyle(color: darkText, fontWeight: FontWeight.w600),
+        headlineSmall: TextStyle(color: darkText, fontWeight: FontWeight.w600),
+        titleLarge: TextStyle(
+            color: darkText, fontWeight: FontWeight.w600, fontSize: 20),
+        titleMedium: TextStyle(
+            color: darkText, fontWeight: FontWeight.w500, fontSize: 16),
+        titleSmall: TextStyle(
+            color: darkText, fontWeight: FontWeight.w500, fontSize: 14),
+        bodyLarge: TextStyle(color: darkText, fontSize: 16),
+        bodyMedium: TextStyle(color: darkText, fontSize: 14),
+        bodySmall: TextStyle(color: mediumText, fontSize: 12),
+        labelLarge: TextStyle(color: darkText, fontWeight: FontWeight.w500),
+        labelMedium: TextStyle(color: mediumText, fontWeight: FontWeight.w500),
+        labelSmall: TextStyle(color: mediumText, fontWeight: FontWeight.w500),
       ),
 
       // Card theme
@@ -64,7 +93,7 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
-          foregroundColor: Colors.white,
+          foregroundColor: lightText,
           elevation: 3,
           shadowColor: primaryColor.withOpacity(0.3),
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
@@ -89,7 +118,7 @@ class AppTheme {
       // Floating action button theme
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: accentColor,
-        foregroundColor: Colors.white,
+        foregroundColor: lightText,
         elevation: 6,
       ),
 
@@ -113,24 +142,29 @@ class AppTheme {
           horizontal: 20,
           vertical: 16,
         ),
-        labelStyle: const TextStyle(color: primaryColor),
-        hintStyle: TextStyle(color: primaryColor.withOpacity(0.6)),
+        labelStyle:
+            const TextStyle(color: darkText, fontWeight: FontWeight.w500),
+        hintStyle: TextStyle(color: mediumText.withOpacity(0.7)),
       ),
 
       // Chip theme
       chipTheme: ChipThemeData(
         backgroundColor: lightPink,
         selectedColor: primaryColor,
-        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: darkText,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
 
       // Tab bar theme
       tabBarTheme: const TabBarThemeData(
-        labelColor: Colors.white,
+        labelColor: lightText,
         unselectedLabelColor: Color(0xFFFFB3C6),
-        indicatorColor: Colors.white,
+        indicatorColor: lightText,
         labelStyle: TextStyle(fontWeight: FontWeight.w600),
       ),
 
@@ -148,31 +182,70 @@ class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.dark,
       colorScheme: const ColorScheme.dark(
         primary: softPink,
         secondary: mediumPink,
-        surface: Color(0xFF1A1A1A),
+        surface: Color(0xFF1E1E1E),
         background: Color(0xFF121212),
         error: errorColor,
-        onPrimary: darkPink,
-        onSecondary: darkPink,
-        onSurface: lightPink,
-        onBackground: lightPink,
-        onError: Colors.white,
+        onPrimary: darkText,
+        onSecondary: darkText,
+        onSurface: Color(0xFFE1E1E1),
+        onBackground: Color(0xFFE1E1E1),
+        onError: lightText,
         tertiary: primaryColor,
       ),
 
+      // Text theme with proper contrast for dark mode
+      textTheme: const TextTheme(
+        displayLarge:
+            TextStyle(color: Color(0xFFE1E1E1), fontWeight: FontWeight.bold),
+        displayMedium:
+            TextStyle(color: Color(0xFFE1E1E1), fontWeight: FontWeight.bold),
+        displaySmall:
+            TextStyle(color: Color(0xFFE1E1E1), fontWeight: FontWeight.bold),
+        headlineLarge:
+            TextStyle(color: Color(0xFFE1E1E1), fontWeight: FontWeight.w600),
+        headlineMedium:
+            TextStyle(color: Color(0xFFE1E1E1), fontWeight: FontWeight.w600),
+        headlineSmall:
+            TextStyle(color: Color(0xFFE1E1E1), fontWeight: FontWeight.w600),
+        titleLarge: TextStyle(
+            color: Color(0xFFE1E1E1),
+            fontWeight: FontWeight.w600,
+            fontSize: 20),
+        titleMedium: TextStyle(
+            color: Color(0xFFE1E1E1),
+            fontWeight: FontWeight.w500,
+            fontSize: 16),
+        titleSmall: TextStyle(
+            color: Color(0xFFE1E1E1),
+            fontWeight: FontWeight.w500,
+            fontSize: 14),
+        bodyLarge: TextStyle(color: Color(0xFFE1E1E1), fontSize: 16),
+        bodyMedium: TextStyle(color: Color(0xFFE1E1E1), fontSize: 14),
+        bodySmall: TextStyle(color: Color(0xFFB0B0B0), fontSize: 12),
+        labelLarge:
+            TextStyle(color: Color(0xFFE1E1E1), fontWeight: FontWeight.w500),
+        labelMedium:
+            TextStyle(color: Color(0xFFB0B0B0), fontWeight: FontWeight.w500),
+        labelSmall:
+            TextStyle(color: Color(0xFFB0B0B0), fontWeight: FontWeight.w500),
+      ),
+
       appBarTheme: const AppBarTheme(
-        backgroundColor: darkPink,
-        foregroundColor: lightPink,
+        backgroundColor: Color(0xFF1E1E1E),
+        foregroundColor: Color(0xFFE1E1E1),
         elevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w700,
-          color: lightPink,
+          color: Color(0xFFE1E1E1),
           letterSpacing: 0.5,
         ),
+        iconTheme: IconThemeData(color: Color(0xFFE1E1E1)),
       ),
 
       cardTheme: CardThemeData(
@@ -186,7 +259,7 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: softPink,
-          foregroundColor: darkPink,
+          foregroundColor: darkText,
           elevation: 3,
           shadowColor: softPink.withOpacity(0.3),
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
@@ -199,18 +272,22 @@ class AppTheme {
 
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        foregroundColor: lightText,
         elevation: 6,
       ),
 
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: const BorderSide(color: softPink),
+          borderSide: const BorderSide(color: Color(0xFF444444)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
           borderSide: const BorderSide(color: softPink, width: 2),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: const BorderSide(color: Color(0xFF444444)),
         ),
         filled: true,
         fillColor: const Color(0xFF2A2A2A),
@@ -218,32 +295,42 @@ class AppTheme {
           horizontal: 20,
           vertical: 16,
         ),
-        labelStyle: const TextStyle(color: softPink),
-        hintStyle: TextStyle(color: softPink.withOpacity(0.6)),
+        labelStyle: const TextStyle(
+            color: Color(0xFFE1E1E1), fontWeight: FontWeight.w500),
+        hintStyle: const TextStyle(color: Color(0xFFB0B0B0)),
       ),
 
       chipTheme: ChipThemeData(
         backgroundColor: const Color(0xFF2A2A2A),
         selectedColor: softPink,
-        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFFE1E1E1),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
 
-      tabBarTheme: TabBarThemeData(
-        labelColor: lightPink,
-        unselectedLabelColor: softPink.withOpacity(0.7),
-        indicatorColor: lightPink,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+      tabBarTheme: const TabBarThemeData(
+        labelColor: Color(0xFFE1E1E1),
+        unselectedLabelColor: Color(0xFFB0B0B0),
+        indicatorColor: softPink,
+        labelStyle: TextStyle(fontWeight: FontWeight.w600),
       ),
 
-      iconTheme: const IconThemeData(color: softPink, size: 24),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: softPink,
+        linearTrackColor: Color(0xFF444444),
+      ),
+
+      iconTheme: const IconThemeData(color: Color(0xFFE1E1E1), size: 24),
     );
   }
 
-  // Utility methods for colors
+  // Helper method to get priority color
   static Color getPriorityColor(String priority) {
-    switch (priority) {
+    switch (priority.toLowerCase()) {
       case 'high':
         return highPriority;
       case 'medium':
@@ -255,22 +342,22 @@ class AppTheme {
     }
   }
 
-  // Gradient decorations for special UI elements
-  static BoxDecoration get pinkGradientDecoration => BoxDecoration(
-    gradient: const LinearGradient(
-      colors: [primaryColor, softPink],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    ),
-    borderRadius: BorderRadius.circular(20),
-  );
+  // Helper method to get priority color with opacity
+  static Color getPriorityColorWithOpacity(String priority, double opacity) {
+    return getPriorityColor(priority).withOpacity(opacity);
+  }
 
-  static BoxDecoration get lightPinkGradientDecoration => BoxDecoration(
-    gradient: LinearGradient(
-      colors: [lightPink, mediumPink.withOpacity(0.3)],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    ),
-    borderRadius: BorderRadius.circular(15),
-  );
+  // Pink gradient decoration for backward compatibility
+  static BoxDecoration get pinkGradientDecoration {
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          primaryColor,
+          accentColor,
+        ],
+      ),
+    );
+  }
 }

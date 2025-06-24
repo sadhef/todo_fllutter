@@ -1,158 +1,280 @@
 import 'dart:io';
-import 'package:audio_waveforms/audio_waveforms.dart';
+import 'package:flutter/foundation.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:path/path.dart' as path;
+import 'package:audio_waveforms/audio_waveforms.dart';
 
 class VoiceNoteService {
   static final VoiceNoteService _instance = VoiceNoteService._internal();
   factory VoiceNoteService() => _instance;
   VoiceNoteService._internal();
 
-  final RecorderController _recorderController = RecorderController();
+  RecorderController? _recorderController;
+  PlayerController? _playerController;
   final AudioPlayer _audioPlayer = AudioPlayer();
 
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
+
   bool _isRecording = false;
-  bool _isPlaying = false;
-  String? _currentRecordingPath;
-
-  // Getters
   bool get isRecording => _isRecording;
+
+  bool _isPlaying = false;
   bool get isPlaying => _isPlaying;
-  RecorderController get recorderController => _recorderController;
 
-  // Initialize service and request permissions
-  Future<bool> initialize() async {
+  String? _currentRecordingPath;
+  String? get currentRecordingPath => _currentRecordingPath;
+
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+
     try {
-      final microphonePermission = await Permission.microphone.request();
-      return microphonePermission == PermissionStatus.granted;
+      _recorderController = RecorderController();
+      _playerController = PlayerController();
+
+      await _recorderController!.checkPermission();
+      _isInitialized = true;
+
+      if (kDebugMode) {
+        print('VoiceNoteService initialized successfully');
+      }
     } catch (e) {
-      print('Error initializing voice note service: $e');
-      return false;
+      if (kDebugMode) {
+        print('Error initializing VoiceNoteService: $e');
+      }
     }
   }
 
-  // Start recording voice note
-  Future<bool> startRecording() async {
+  Future<String?> startRecording() async {
+    if (!_isInitialized || _isRecording) return null;
+
     try {
-      if (_isRecording) return false;
-
-      final hasPermission = await Permission.microphone.isGranted;
-      if (!hasPermission) return false;
-
       final directory = await getApplicationDocumentsDirectory();
-      final voiceNotesDir = Directory('${directory.path}/voice_notes');
-      if (!await voiceNotesDir.exists()) {
-        await voiceNotesDir.create(recursive: true);
-      }
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filePath = '${directory.path}/voice_note_$timestamp.m4a';
 
-      final fileName =
-          'voice_note_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      _currentRecordingPath = path.join(voiceNotesDir.path, fileName);
-
-      await _recorderController.record(path: _currentRecordingPath!);
+      await _recorderController!.record(path: filePath);
       _isRecording = true;
+      _currentRecordingPath = filePath;
 
-      return true;
-    } catch (e) {
-      print('Error starting recording: $e');
-      _isRecording = false;
-      return false;
-    }
-  }
-
-  // Stop recording and return file path
-  Future<String?> stopRecording() async {
-    try {
-      if (!_isRecording) return null;
-
-      final filePath = await _recorderController.stop();
-      _isRecording = false;
-
-      if (filePath != null && await File(filePath).exists()) {
-        return filePath;
+      if (kDebugMode) {
+        print('Recording started: $filePath');
       }
 
-      return _currentRecordingPath;
+      return filePath;
     } catch (e) {
-      print('Error stopping recording: $e');
-      _isRecording = false;
+      if (kDebugMode) {
+        print('Error starting recording: $e');
+      }
       return null;
     }
   }
 
-  // Play voice note
-  Future<bool> playVoiceNote(String filePath) async {
+  Future<String?> stopRecording() async {
+    if (!_isRecording || _recorderController == null) return null;
+
     try {
-      if (_isPlaying) {
-        await stopPlayback();
+      final path = await _recorderController!.stop();
+      _isRecording = false;
+
+      if (kDebugMode) {
+        print('Recording stopped: $path');
       }
 
-      if (!await File(filePath).exists()) {
-        return false;
+      return path;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error stopping recording: $e');
       }
+      return null;
+    }
+  }
 
+  Future<void> pauseRecording() async {
+    if (!_isRecording || _recorderController == null) return;
+
+    try {
+      await _recorderController!.pause();
+
+      if (kDebugMode) {
+        print('Recording paused');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error pausing recording: $e');
+      }
+    }
+  }
+
+  Future<void> resumeRecording() async {
+    if (!_isRecording || _recorderController == null) return;
+
+    try {
+      await _recorderController!.record();
+
+      if (kDebugMode) {
+        print('Recording resumed');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error resuming recording: $e');
+      }
+    }
+  }
+
+  Future<void> playVoiceNote(String filePath) async {
+    if (!File(filePath).existsSync()) {
+      if (kDebugMode) {
+        print('Voice note file not found: $filePath');
+      }
+      return;
+    }
+
+    try {
       await _audioPlayer.play(DeviceFileSource(filePath));
       _isPlaying = true;
 
+      if (kDebugMode) {
+        print('Playing voice note: $filePath');
+      }
+
+      // Listen for completion
       _audioPlayer.onPlayerComplete.listen((_) {
         _isPlaying = false;
       });
-
-      return true;
     } catch (e) {
-      print('Error playing voice note: $e');
-      _isPlaying = false;
-      return false;
+      if (kDebugMode) {
+        print('Error playing voice note: $e');
+      }
     }
   }
 
-  // Stop playback
-  Future<void> stopPlayback() async {
+  Future<void> stopPlaying() async {
     try {
       await _audioPlayer.stop();
       _isPlaying = false;
+
+      if (kDebugMode) {
+        print('Stopped playing voice note');
+      }
     } catch (e) {
-      print('Error stopping playback: $e');
+      if (kDebugMode) {
+        print('Error stopping playback: $e');
+      }
     }
   }
 
-  // Get voice note duration
   Future<Duration?> getVoiceNoteDuration(String filePath) async {
-    try {
-      if (!await File(filePath).exists()) return null;
+    if (!File(filePath).existsSync()) return null;
 
+    try {
       final tempPlayer = AudioPlayer();
       await tempPlayer.setSource(DeviceFileSource(filePath));
       final duration = await tempPlayer.getDuration();
       await tempPlayer.dispose();
 
+      if (kDebugMode) {
+        print('Voice note duration: $duration');
+      }
+
       return duration;
     } catch (e) {
-      print('Error getting voice note duration: $e');
+      if (kDebugMode) {
+        print('Error getting voice note duration: $e');
+      }
       return null;
     }
   }
 
-  // Delete voice note file
-  Future<bool> deleteVoiceNote(String filePath) async {
+  Future<void> deleteVoiceNote(String filePath) async {
     try {
       final file = File(filePath);
       if (await file.exists()) {
         await file.delete();
-        return true;
+
+        if (kDebugMode) {
+          print('Voice note deleted: $filePath');
+        }
       }
-      return false;
     } catch (e) {
-      print('Error deleting voice note: $e');
+      if (kDebugMode) {
+        print('Error deleting voice note: $e');
+      }
+    }
+  }
+
+  Stream<Duration>? getRecordingStream() {
+    return _recorderController?.onRecorderStateChanged.map((state) {
+      // RecorderState doesn't have duration property, return current position
+      return Duration
+          .zero; // You may need to implement this differently based on your needs
+    });
+  }
+
+  Future<List<double>?> getWaveformData(String filePath) async {
+    if (!File(filePath).existsSync()) return null;
+
+    try {
+      final playerController = PlayerController();
+      await playerController.preparePlayer(
+        path: filePath,
+        shouldExtractWaveform: true,
+      );
+
+      final waveformData = playerController.waveformData;
+      playerController.dispose(); // Remove await since dispose() returns void
+
+      return waveformData;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error getting waveform data: $e');
+      }
+      return null;
+    }
+  }
+
+  Future<bool> hasPermission() async {
+    if (_recorderController == null) return false;
+
+    try {
+      return await _recorderController!.checkPermission();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error checking permission: $e');
+      }
       return false;
     }
   }
 
-  // Dispose resources
-  void dispose() {
-    _recorderController.dispose();
-    _audioPlayer.dispose();
+  Future<void> dispose() async {
+    try {
+      if (_isRecording) {
+        await stopRecording();
+      }
+
+      if (_isPlaying) {
+        await stopPlaying();
+      }
+
+      _recorderController
+          ?.dispose(); // Remove await since dispose() returns void
+      _playerController?.dispose(); // Remove await since dispose() returns void
+      await _audioPlayer.dispose();
+
+      _isInitialized = false;
+
+      if (kDebugMode) {
+        print('VoiceNoteService disposed');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error disposing VoiceNoteService: $e');
+      }
+    }
+  }
+
+  // Add the missing stopPlayback method for compatibility
+  Future<void> stopPlayback() async {
+    await stopPlaying();
   }
 }

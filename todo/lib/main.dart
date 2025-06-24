@@ -78,38 +78,43 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    _setupAnimations();
-    _navigateToHome();
-  }
 
-  void _setupAnimations() {
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(seconds: 2),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-      ),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
 
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.2, 0.8, curve: Curves.elasticOut),
-      ),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.elasticOut,
+    ));
 
     _animationController.forward();
-  }
 
-  void _navigateToHome() {
-    Future.delayed(const Duration(milliseconds: 3000), () {
+    // Navigate to home screen after splash
+    Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const HomeScreen(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
         );
       }
     });
@@ -123,9 +128,25 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFE91E63),
-      body: SafeArea(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDarkMode
+                ? [
+                    const Color(0xFF1E1E1E),
+                    const Color(0xFF121212),
+                  ]
+                : [
+                    AppTheme.primaryColor,
+                    AppTheme.accentColor,
+                  ],
+          ),
+        ),
         child: Center(
           child: AnimatedBuilder(
             animation: _animationController,
@@ -137,6 +158,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // App Icon
                       Container(
                         width: 120,
                         height: 120,
@@ -145,46 +167,55 @@ class _SplashScreenState extends State<SplashScreen>
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
+                              color: Colors.black.withOpacity(0.2),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          Icons.check_circle_outline,
+                        child: Icon(
+                          Icons.check_circle_rounded,
                           size: 60,
-                          color: Color(0xFFE91E63),
+                          color: AppTheme.primaryColor,
                         ),
                       ),
+
                       const SizedBox(height: 30),
-                      const Text(
+
+                      // App Name
+                      Text(
                         'Re-Todo',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          letterSpacing: 2,
+                          letterSpacing: 1.2,
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      const Text(
+
+                      const SizedBox(height: 8),
+
+                      // Tagline
+                      Text(
                         'Your Personal Task Manager',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.white70,
-                          letterSpacing: 1,
+                          color: Colors.white.withOpacity(0.9),
+                          letterSpacing: 0.5,
                         ),
                       ),
+
                       const SizedBox(height: 50),
-                      Container(
+
+                      // Loading Indicator
+                      SizedBox(
                         width: 40,
                         height: 40,
-                        child: const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
+                        child: CircularProgressIndicator(
                           strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white.withOpacity(0.8),
+                          ),
                         ),
                       ),
                     ],

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Todo {
   String id;
   String title;
@@ -23,6 +25,9 @@ class Todo {
     this.voiceNoteDuration,
   });
 
+  // Helper method to check if todo has voice note
+  bool get hasVoiceNote => voiceNotePath != null && voiceNotePath!.isNotEmpty;
+
   // Convert Todo to Map (similar to MongoDB document)
   Map<String, dynamic> toMap() {
     return {
@@ -47,9 +52,8 @@ class Todo {
       description: map['description'] ?? '',
       isCompleted: map['isCompleted'] ?? false,
       createdAt: DateTime.parse(map['createdAt']),
-      updatedAt: map['updatedAt'] != null
-          ? DateTime.parse(map['updatedAt'])
-          : null,
+      updatedAt:
+          map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
       dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : null,
       priority: map['priority'] ?? 'medium',
       voiceNotePath: map['voiceNotePath'],
@@ -86,28 +90,45 @@ class Todo {
     );
   }
 
-  // Check if todo has voice note
-  bool get hasVoiceNote => voiceNotePath != null && voiceNotePath!.isNotEmpty;
+  // Convert to JSON string
+  String toJson() => jsonEncode(toMap());
 
-  // Get formatted voice note duration
-  String get formattedVoiceNoteDuration {
-    if (voiceNoteDuration == null) return '';
-    final minutes = voiceNoteDuration!.inMinutes;
-    final seconds = voiceNoteDuration!.inSeconds % 60;
-    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
-  }
+  // Create from JSON string
+  factory Todo.fromJson(String source) => Todo.fromMap(jsonDecode(source));
 
   @override
   String toString() {
-    return 'Todo{id: $id, title: $title, isCompleted: $isCompleted, hasVoiceNote: $hasVoiceNote}';
+    return 'Todo(id: $id, title: $title, description: $description, isCompleted: $isCompleted, createdAt: $createdAt, updatedAt: $updatedAt, dueDate: $dueDate, priority: $priority, voiceNotePath: $voiceNotePath, voiceNoteDuration: $voiceNoteDuration)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is Todo && other.id == id;
+
+    return other is Todo &&
+        other.id == id &&
+        other.title == title &&
+        other.description == description &&
+        other.isCompleted == isCompleted &&
+        other.createdAt == createdAt &&
+        other.updatedAt == updatedAt &&
+        other.dueDate == dueDate &&
+        other.priority == priority &&
+        other.voiceNotePath == voiceNotePath &&
+        other.voiceNoteDuration == voiceNoteDuration;
   }
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode {
+    return id.hashCode ^
+        title.hashCode ^
+        description.hashCode ^
+        isCompleted.hashCode ^
+        createdAt.hashCode ^
+        updatedAt.hashCode ^
+        dueDate.hashCode ^
+        priority.hashCode ^
+        voiceNotePath.hashCode ^
+        voiceNoteDuration.hashCode;
+  }
 }

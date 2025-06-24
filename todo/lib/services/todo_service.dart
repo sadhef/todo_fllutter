@@ -1,18 +1,54 @@
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/todo.dart';
 
-// This simulates localStorage/sessionStorage from web development
-// In a real app, you'd use SharedPreferences or SQLite
 class TodoService {
   static final TodoService _instance = TodoService._internal();
   factory TodoService() => _instance;
   TodoService._internal();
 
-  // In-memory storage (similar to a simple state store)
-  final List<Todo> _todos = [];
+  // SharedPreferences instance for persistent storage
+  late SharedPreferences _prefs;
+  static const String _todosKey = 'todos_list';
+
+  // In-memory cache for better performance
+  List<Todo> _todos = [];
 
   // Simulated async operations (like API calls)
   static const Duration _delay = Duration(milliseconds: 300);
+
+  // Initialize SharedPreferences and load stored todos
+  Future<void> initialize() async {
+    _prefs = await SharedPreferences.getInstance();
+    await _loadTodosFromStorage();
+  }
+
+  // Load todos from SharedPreferences
+  Future<void> _loadTodosFromStorage() async {
+    try {
+      final String? todosJson = _prefs.getString(_todosKey);
+      if (todosJson != null) {
+        final List<dynamic> todosData = jsonDecode(todosJson);
+        _todos = todosData.map((todoMap) => Todo.fromMap(todoMap)).toList();
+      }
+    } catch (e) {
+      print('Error loading todos from storage: $e');
+      _todos = [];
+    }
+  }
+
+  // Save todos to SharedPreferences
+  Future<void> _saveTodosToStorage() async {
+    try {
+      final List<Map<String, dynamic>> todosData = _todos
+          .map((todo) => todo.toMap())
+          .toList();
+      final String todosJson = jsonEncode(todosData);
+      await _prefs.setString(_todosKey, todosJson);
+    } catch (e) {
+      print('Error saving todos to storage: $e');
+    }
+  }
 
   // Get all todos (GET /api/todos)
   Future<List<Todo>> getAllTodos() async {
@@ -48,6 +84,7 @@ class TodoService {
     );
 
     _todos.add(newTodo);
+    await _saveTodosToStorage(); // Save to persistent storage
     return newTodo;
   }
 
@@ -63,6 +100,7 @@ class TodoService {
     final updated = updatedTodo.copyWith(id: id, updatedAt: DateTime.now());
 
     _todos[index] = updated;
+    await _saveTodosToStorage(); // Save to persistent storage
     return updated;
   }
 
@@ -81,6 +119,7 @@ class TodoService {
     );
 
     _todos[index] = updated;
+    await _saveTodosToStorage(); // Save to persistent storage
     return updated;
   }
 
@@ -94,12 +133,14 @@ class TodoService {
     }
 
     _todos.removeAt(index);
+    await _saveTodosToStorage(); // Save to persistent storage
   }
 
   // Bulk operations
   Future<void> deleteMultipleTodos(List<String> ids) async {
     await Future.delayed(_delay);
     _todos.removeWhere((todo) => ids.contains(todo.id));
+    await _saveTodosToStorage(); // Save to persistent storage
   }
 
   Future<void> toggleMultipleTodos(List<String> ids, bool isCompleted) async {
@@ -113,6 +154,7 @@ class TodoService {
         );
       }
     }
+    await _saveTodosToStorage(); // Save to persistent storage
   }
 
   // Search todos (GET /api/todos/search?q=...)
@@ -151,9 +193,15 @@ class TodoService {
     };
   }
 
+  // Clear all data (for testing purposes)
+  Future<void> clearAllData() async {
+    _todos.clear();
+    await _prefs.remove(_todosKey);
+  }
+
   // Initialize with sample data (empty by default)
   Future<void> initializeSampleData() async {
-    // Start with empty todos - no sample data
-    // User will create their own todos
+    // Start with empty todos - user will create their own todos
+    // Data is now persistent, so no need for sample data
   }
 }
