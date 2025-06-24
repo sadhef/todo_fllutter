@@ -211,4 +211,41 @@ class NotificationService {
     if (!_isInitialized) return;
     await _flutterLocalNotificationsPlugin.cancelAll();
   }
+
+  // Test notification
+  Future<void> showTestNotification() async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+          'test_channel',
+          'Test Notifications',
+          channelDescription: 'Test notification channel',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+          color: Color(0xFFE91E63),
+        );
+
+    const DarwinNotificationDetails iosPlatformChannelSpecifics =
+        DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        );
+
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iosPlatformChannelSpecifics,
+    );
+
+    await _flutterLocalNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      '🔔 Test Notification',
+      'Your notification system is working perfectly!',
+      platformChannelSpecifics,
+    );
+  }
 }
