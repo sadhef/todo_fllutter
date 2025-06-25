@@ -65,21 +65,36 @@ class NotificationService {
     }
   }
 
-  /// Request notification permissions
+  /// Request notification permissions - COMPATIBLE WITH VERSION 17.0.0
   Future<void> _requestPermissions() async {
     try {
-      // Request basic notification permission
+      // Request basic notification permission using permission_handler
       await Permission.notification.request();
 
-      // Request Android-specific permissions
+      // For Android 13+ (API level 33+), request notification permission
+      if (await Permission.notification.isDenied) {
+        await Permission.notification.request();
+      }
+
+      // For version 17.0.0, we don't call requestPermission on AndroidFlutterLocalNotificationsPlugin
+      // as this method was removed. We rely on permission_handler instead.
       final androidPlugin = _flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
       if (androidPlugin != null) {
-        await androidPlugin.requestPermission();
-        await androidPlugin.requestExactAlarmsPermission();
+        // Only request exact alarms permission if available
+        try {
+          // Check if the method exists before calling it
+          final bool? exactAlarmsResult =
+              await androidPlugin.requestExactAlarmsPermission();
+          print('Exact alarms permission result: $exactAlarmsResult');
+        } catch (e) {
+          print('⚠️ Exact alarms permission not available in this version: $e');
+        }
       }
+
+      print('✅ Permissions requested successfully');
     } catch (e) {
       print('⚠️ Permission request error: $e');
     }
@@ -99,356 +114,166 @@ class NotificationService {
           'Todo Reminders',
           description: 'Reminders for your pending todos',
           importance: Importance.high,
-          enableVibration: true,
           playSound: true,
+          enableVibration: true,
+          showBadge: true,
         ),
       );
 
-      // Urgent reminders channel
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'urgent_reminders',
-          'Urgent Todo Reminders',
-          description: 'Urgent reminders for overdue todos',
-          importance: Importance.max,
-          enableVibration: true,
-          playSound: true,
-          enableLights: true,
-          ledColor: Color(0xFFFF0000),
-        ),
-      );
-
-      // Completion celebrations
+      // Celebration notifications channel
       await androidPlugin.createNotificationChannel(
         const AndroidNotificationChannel(
           'celebrations',
           'Task Celebrations',
-          description: 'Celebrations for completed todos',
-          importance: Importance.high,
-          enableVibration: true,
+          description: 'Celebrations for completed tasks',
+          importance: Importance.defaultImportance,
           playSound: true,
+          enableVibration: false,
+          showBadge: false,
         ),
       );
 
-      print('📢 Notification channels created');
+      print('✅ Notification channels created');
     }
   }
 
   /// Handle notification taps
   void _onNotificationTapped(NotificationResponse response) {
     print('🔔 Notification tapped: ${response.payload}');
-    // You can add navigation logic here if needed
+
+    if (response.payload != null) {
+      final payload = response.payload!;
+
+      if (payload.startsWith('todo:')) {
+        final todoId = payload.substring(5);
+        print('📝 Opening todo: $todoId');
+        // Navigate to specific todo (implement navigation logic here)
+      } else if (payload.contains(':celebration')) {
+        final todoId = payload.split(':')[0];
+        print('🎉 Celebration tapped for todo: $todoId');
+      }
+    }
   }
 
-  /// Schedule smart reminders for a todo
-  Future<bool> scheduleReminderNotification(Todo todo) async {
-    if (!_isInitialized || todo.dueDate == null || todo.isCompleted) {
-      return false;
-    }
+  /// Schedule reminder notification for a todo
+  Future<void> scheduleReminderNotification(Todo todo) async {
+    if (!_isInitialized) await initialize();
+    if (todo.dueDate == null || todo.isCompleted) return;
 
     try {
-      print('📅 Scheduling reminders for: ${todo.title}');
-
-      // Cancel any existing notifications for this todo
-      await cancelReminderNotification(todo.id);
-
       final now = DateTime.now();
       final dueDate = todo.dueDate!;
-      final timeDifference = dueDate.difference(now);
 
-      // If already overdue, send overdue notification
-      if (timeDifference.isNegative) {
-        await _sendOverdueNotification(todo);
-        return true;
-      }
-
-      // Calculate smart reminder times
-      final reminderTimes = _calculateReminderTimes(dueDate, timeDifference);
-      int scheduledCount = 0;
-
-      // Schedule each reminder
-      for (int i = 0; i < reminderTimes.length; i++) {
-        final reminderTime = reminderTimes[i];
-
-        if (reminderTime.isAfter(now)) {
-          final success =
-              await _scheduleIndividualReminder(todo, reminderTime, i);
-          if (success) scheduledCount++;
-        }
-      }
-
-      print('✅ Scheduled $scheduledCount reminders for ${todo.title}');
-      return scheduledCount > 0;
-    } catch (e) {
-      print('❌ Error scheduling reminders: $e');
-      return false;
-    }
-  }
-
-  /// Calculate optimal reminder times based on due date
-  List<DateTime> _calculateReminderTimes(
-      DateTime dueDate, Duration timeDifference) {
-    final reminderTimes = <DateTime>[];
-
-    // Smart scheduling based on time remaining
-    if (timeDifference.inDays >= 7) {
-      // Long term: 7 days, 3 days, 1 day, 4 hours, 1 hour, due
-      reminderTimes.addAll([
-        dueDate.subtract(const Duration(days: 7)),
-        dueDate.subtract(const Duration(days: 3)),
-        dueDate.subtract(const Duration(days: 1)),
-        dueDate.subtract(const Duration(hours: 4)),
-        dueDate.subtract(const Duration(hours: 1)),
-        dueDate, // Due now
-      ]);
-    } else if (timeDifference.inDays >= 3) {
-      // Medium term: 3 days, 1 day, 4 hours, 1 hour, due
-      reminderTimes.addAll([
-        dueDate.subtract(const Duration(days: 3)),
-        dueDate.subtract(const Duration(days: 1)),
-        dueDate.subtract(const Duration(hours: 4)),
-        dueDate.subtract(const Duration(hours: 1)),
-        dueDate,
-      ]);
-    } else if (timeDifference.inDays >= 1) {
-      // Daily: 1 day, 4 hours, 1 hour, 15 min, due
-      reminderTimes.addAll([
-        dueDate.subtract(const Duration(days: 1)),
-        dueDate.subtract(const Duration(hours: 4)),
-        dueDate.subtract(const Duration(hours: 1)),
-        dueDate.subtract(const Duration(minutes: 15)),
-        dueDate,
-      ]);
-    } else if (timeDifference.inHours >= 4) {
-      // Half day: 4 hours, 1 hour, 15 min, due
-      reminderTimes.addAll([
-        dueDate.subtract(const Duration(hours: 4)),
-        dueDate.subtract(const Duration(hours: 1)),
-        dueDate.subtract(const Duration(minutes: 15)),
-        dueDate,
-      ]);
-    } else if (timeDifference.inHours >= 1) {
-      // Hourly: 1 hour, 15 min, 5 min, due
-      reminderTimes.addAll([
-        dueDate.subtract(const Duration(hours: 1)),
-        dueDate.subtract(const Duration(minutes: 15)),
-        dueDate.subtract(const Duration(minutes: 5)),
-        dueDate,
-      ]);
-    } else if (timeDifference.inMinutes >= 15) {
-      // Short: 15 min, 5 min, due
-      reminderTimes.addAll([
-        dueDate.subtract(const Duration(minutes: 15)),
-        dueDate.subtract(const Duration(minutes: 5)),
-        dueDate,
-      ]);
-    } else if (timeDifference.inMinutes >= 5) {
-      // Very short: 5 min, 2 min, due
-      reminderTimes.addAll([
-        dueDate.subtract(const Duration(minutes: 5)),
-        dueDate.subtract(const Duration(minutes: 2)),
-        dueDate,
-      ]);
-    } else if (timeDifference.inMinutes >= 2) {
-      // Ultra short: 2 min, due
-      reminderTimes.addAll([
-        dueDate.subtract(const Duration(minutes: 2)),
-        dueDate,
-      ]);
-    } else {
-      // Immediate: due now
-      reminderTimes.add(dueDate);
-    }
-
-    return reminderTimes;
-  }
-
-  /// Schedule individual reminder notification
-  Future<bool> _scheduleIndividualReminder(
-      Todo todo, DateTime reminderTime, int index) async {
-    try {
-      final dueDate = todo.dueDate!;
-      final isDueNow = reminderTime.isAtSameMomentAs(dueDate);
-      final minutesUntilDue = dueDate.difference(reminderTime).inMinutes;
-
-      // Create notification content
-      final content =
-          _createNotificationContent(todo, minutesUntilDue, isDueNow);
-
-      // Determine urgency
-      final isUrgent = isDueNow || minutesUntilDue <= 5;
-      final channelId = isUrgent ? 'urgent_reminders' : 'todo_reminders';
-
-      // Create notification details
-      final androidDetails = AndroidNotificationDetails(
-        channelId,
-        isUrgent ? 'Urgent Todo Reminders' : 'Todo Reminders',
-        channelDescription: isUrgent
-            ? 'Urgent reminders for due todos'
-            : 'Reminders for upcoming todos',
-        importance: isUrgent ? Importance.max : Importance.high,
-        priority: isUrgent ? Priority.max : Priority.high,
-        icon: '@mipmap/ic_launcher',
-        color: const Color(0xFFE91E63),
-        playSound: true,
-        enableVibration: true,
-        enableLights: isUrgent,
-        ongoing: isDueNow,
-        autoCancel: !isDueNow,
-        category: AndroidNotificationCategory.reminder,
-        styleInformation: BigTextStyleInformation(
-          content['body']!,
-          contentTitle: content['title'],
-        ),
-      );
-
-      const iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-        interruptionLevel: InterruptionLevel.active,
-      );
-
-      final platformDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      // Generate unique ID
-      final notificationId = _generateNotificationId(todo.id, index);
-
-      // Schedule notification
-      await _flutterLocalNotificationsPlugin.zonedSchedule(
-        notificationId,
-        content['title']!,
-        content['body']!,
-        tz.TZDateTime.from(reminderTime, tz.local),
-        platformDetails,
-        payload: '${todo.id}:$index',
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-
-      print('✅ Scheduled notification $notificationId at $reminderTime');
-      return true;
-    } catch (e) {
-      print('❌ Error scheduling individual reminder: $e');
-      return false;
-    }
-  }
-
-  /// Create notification content based on timing
-  Map<String, String> _createNotificationContent(
-      Todo todo, int minutesUntilDue, bool isDueNow) {
-    String title;
-    String body;
-
-    if (isDueNow) {
-      title = '🚨 Task Due Now!';
-      body = '${todo.title} is due right now!';
-    } else if (minutesUntilDue <= 2) {
-      title =
-          '🔥 URGENT: Due in $minutesUntilDue minute${minutesUntilDue != 1 ? 's' : ''}!';
-      body = '${todo.title} - Almost due!';
-    } else if (minutesUntilDue <= 15) {
-      title = '⚠️ Due in $minutesUntilDue minutes';
-      body = '${todo.title} - Don\'t forget!';
-    } else if (minutesUntilDue <= 60) {
-      title = '⏰ Due in 1 hour';
-      body = '${todo.title} - Get ready!';
-    } else if (minutesUntilDue <= 1440) {
-      // 24 hours
-      final hours = (minutesUntilDue / 60).round();
-      title = '📅 Due in $hours hour${hours != 1 ? 's' : ''}';
-      body = '${todo.title} - Plan ahead!';
-    } else {
-      final days = (minutesUntilDue / 1440).round();
-      title = '📅 Due in $days day${days != 1 ? 's' : ''}';
-      body = '${todo.title} - Keep it in mind!';
-    }
-
-    // Add priority indicator
-    if (todo.priority == 'high') {
-      title = '🔴 $title';
-    } else if (todo.priority == 'medium') {
-      title = '🟡 $title';
-    }
-
-    // Add description if short
-    if (todo.description.isNotEmpty && todo.description.length <= 30) {
-      body += '\n📝 ${todo.description}';
-    }
-
-    return {'title': title, 'body': body};
-  }
-
-  /// Send overdue notification
-  Future<void> _sendOverdueNotification(Todo todo) async {
-    try {
-      final minutesOverdue = DateTime.now().difference(todo.dueDate!).inMinutes;
+      // Don't schedule if due date is in the past
+      if (dueDate.isBefore(now)) return;
 
       const androidDetails = AndroidNotificationDetails(
-        'urgent_reminders',
-        'Urgent Todo Reminders',
-        channelDescription: 'Urgent overdue reminders',
-        importance: Importance.max,
-        priority: Priority.max,
-        icon: '@mipmap/ic_launcher',
-        color: Color(0xFFFF0000),
-        playSound: true,
-        enableVibration: true,
-        enableLights: true,
-        ongoing: true,
-        category: AndroidNotificationCategory.reminder,
-      );
-
-      const iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-        interruptionLevel: InterruptionLevel.critical,
-      );
-
-      const platformDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      await _flutterLocalNotificationsPlugin.show(
-        _generateNotificationId(todo.id, 999),
-        '🚨 OVERDUE TASK!',
-        '${todo.title} was due $minutesOverdue minute${minutesOverdue != 1 ? 's' : ''} ago!',
-        platformDetails,
-        payload: '${todo.id}:overdue',
-      );
-
-      print('📢 Sent overdue notification for ${todo.title}');
-    } catch (e) {
-      print('❌ Error sending overdue notification: $e');
-    }
-  }
-
-  /// Schedule completion celebration
-  Future<void> scheduleCompletionNotification(Todo todo) async {
-    if (!_isInitialized) return;
-
-    try {
-      const androidDetails = AndroidNotificationDetails(
-        'celebrations',
-        'Task Celebrations',
-        channelDescription: 'Celebrations for completed tasks',
+        'todo_reminders',
+        'Todo Reminders',
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
-        color: Color(0xFF4CAF50),
+        color: Color(0xFFE91E63),
         playSound: true,
         enableVibration: true,
+        showWhen: true,
+        when: null,
       );
 
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        categoryIdentifier: 'todoReminder',
+      );
+
+      const platformDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      // Schedule reminders at different intervals
+      final intervals = [
+        Duration(hours: 24), // 1 day before
+        Duration(hours: 2), // 2 hours before
+        Duration(minutes: 15), // 15 minutes before
+      ];
+
+      for (int i = 0; i < intervals.length; i++) {
+        final reminderTime = dueDate.subtract(intervals[i]);
+
+        if (reminderTime.isAfter(now)) {
+          final notificationId = _generateNotificationId(todo.id, i);
+
+          String timeDesc;
+          if (intervals[i].inDays > 0) {
+            timeDesc =
+                '${intervals[i].inDays} day${intervals[i].inDays > 1 ? 's' : ''}';
+          } else if (intervals[i].inHours > 0) {
+            timeDesc =
+                '${intervals[i].inHours} hour${intervals[i].inHours > 1 ? 's' : ''}';
+          } else {
+            timeDesc =
+                '${intervals[i].inMinutes} minute${intervals[i].inMinutes > 1 ? 's' : ''}';
+          }
+
+          await _flutterLocalNotificationsPlugin.zonedSchedule(
+            notificationId,
+            '⏰ Todo Reminder',
+            '${todo.title} is due in $timeDesc!',
+            tz.TZDateTime.from(reminderTime, tz.local),
+            platformDetails,
+            payload: 'todo:${todo.id}',
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.time,
+          );
+        }
+      }
+
+      // Schedule overdue notification (1 hour after due date)
+      final overdueTime = dueDate.add(const Duration(hours: 1));
+      if (overdueTime.isAfter(now)) {
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
+          _generateNotificationId(todo.id, 999),
+          '⚠️ Overdue Todo',
+          '${todo.title} is now overdue!',
+          tz.TZDateTime.from(overdueTime, tz.local),
+          platformDetails,
+          payload: 'todo:${todo.id}',
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      }
+
+      print('✅ Scheduled reminders for ${todo.title}');
+    } catch (e) {
+      print('❌ Error scheduling reminder: $e');
+    }
+  }
+
+  /// Schedule completion celebration notification
+  Future<void> scheduleCompletionNotification(Todo todo) async {
+    if (!_isInitialized) await initialize();
+
+    try {
+      const androidDetails = AndroidNotificationDetails(
+        'todo_celebrations',
+        'Completion Celebrations',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+        icon: '@mipmap/ic_launcher',
+        color: Color(0xFF4CAF50),
+        playSound: true,
+        enableVibration: false,
+        timeoutAfter: 8000,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: false,
+        presentSound: true,
+        categoryIdentifier: 'todoCelebration',
       );
 
       const platformDetails = NotificationDetails(
@@ -457,7 +282,7 @@ class NotificationService {
       );
 
       await _flutterLocalNotificationsPlugin.show(
-        todo.id.hashCode + 10000,
+        _generateNotificationId(todo.id, 10000),
         '🎉 Task Completed!',
         'Great job! You completed: ${todo.title}',
         platformDetails,
