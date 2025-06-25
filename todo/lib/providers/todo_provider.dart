@@ -37,10 +37,8 @@ class TodoProvider with ChangeNotifier {
   List<String> get priorities => ['low', 'medium', 'high'];
 
   // Todos with voice notes
-  List<Todo> get todosWithVoiceNotes => _todos
-      .where((todo) =>
-          todo.voiceNotePath != null && todo.voiceNotePath!.isNotEmpty)
-      .toList();
+  List<Todo> get todosWithVoiceNotes =>
+      _todos.where((todo) => todo.hasVoiceNote).toList();
 
   // Overdue todos
   List<Todo> get overdueTodos {
@@ -55,59 +53,21 @@ class TodoProvider with ChangeNotifier {
         .toList();
   }
 
-  // Today's todos
-  List<Todo> get todaysTodos {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final tomorrow = today.add(const Duration(days: 1));
-
-    return _todos.where((todo) {
-      if (todo.dueDate == null) return false;
-      final dueDate = DateTime(
-        todo.dueDate!.year,
-        todo.dueDate!.month,
-        todo.dueDate!.day,
-      );
-      return dueDate.isAtSameMomentAs(today) ||
-          (dueDate.isAfter(today) && dueDate.isBefore(tomorrow));
-    }).toList();
-  }
-
-  // Upcoming todos (next 7 days)
-  List<Todo> get upcomingTodos {
-    final now = DateTime.now();
-    final nextWeek = now.add(const Duration(days: 7));
-
-    return _todos.where((todo) {
-      if (todo.dueDate == null || todo.isCompleted) return false;
-      return todo.dueDate!.isAfter(now) && todo.dueDate!.isBefore(nextWeek);
-    }).toList();
-  }
-
-  // High priority todos
-  List<Todo> get highPriorityTodos => _todos
-      .where((todo) => todo.priority == 'high' && !todo.isCompleted)
-      .toList();
-
   // Initialize provider
   Future<void> initialize() async {
-    _setLoading(true);
-    try {
-      await _notificationService.initialize();
-      await _todoService.initialize(); // Initialize SharedPreferences
-      await loadTodos();
-      await loadStats();
+    await _notificationService.initialize();
+    await _todoService.initializeSampleData();
+    await loadTodos();
+    await loadStats();
 
-      // Schedule daily productivity summary
-      await _notificationService.scheduleDailyProductivitySummary();
-    } catch (e) {
-      _setError('Failed to initialize: $e');
-      if (kDebugMode) {
-        print('TodoProvider initialization error: $e');
-      }
-    } finally {
-      _setLoading(false);
-    }
+    // Schedule daily productivity summary
+    await _notificationService.scheduleDailyProductivitySummary();
+  }
+
+  // FIXED: Added refresh method
+  Future<void> refresh() async {
+    await loadTodos();
+    await loadStats();
   }
 
   // Load todos
@@ -121,9 +81,6 @@ class TodoProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _setError('Failed to load todos: $e');
-      if (kDebugMode) {
-        print('Load todos error: $e');
-      }
     } finally {
       _setLoading(false);
     }
@@ -146,15 +103,8 @@ class TodoProvider with ChangeNotifier {
       _applyFilters();
       await loadStats();
       notifyListeners();
-
-      if (kDebugMode) {
-        print('Todo added successfully: ${newTodo.title}');
-      }
     } catch (e) {
       _setError('Failed to add todo: $e');
-      if (kDebugMode) {
-        print('Add todo error: $e');
-      }
     } finally {
       _setLoading(false);
     }
@@ -177,16 +127,9 @@ class TodoProvider with ChangeNotifier {
         _applyFilters();
         await loadStats();
         notifyListeners();
-
-        if (kDebugMode) {
-          print('Todo updated successfully: ${updated.title}');
-        }
       }
     } catch (e) {
       _setError('Failed to update todo: $e');
-      if (kDebugMode) {
-        print('Update todo error: $e');
-      }
     } finally {
       _setLoading(false);
     }
@@ -197,8 +140,6 @@ class TodoProvider with ChangeNotifier {
     final index = _todos.indexWhere((todo) => todo.id == id);
     if (index != -1) {
       final wasCompleted = _todos[index].isCompleted;
-
-      // Optimistic update
       _todos[index] = _todos[index].copyWith(
         isCompleted: !_todos[index].isCompleted,
         updatedAt: DateTime.now(),
@@ -221,27 +162,21 @@ class TodoProvider with ChangeNotifier {
 
       _applyFilters();
       notifyListeners();
+    }
 
-      try {
-        await _todoService.toggleTodo(id);
-        await loadStats();
-
-        if (kDebugMode) {
-          print('Todo toggled successfully: ${_todos[index].title}');
-        }
-      } catch (e) {
-        // Revert optimistic update on error
+    try {
+      await _todoService.toggleTodo(id);
+      await loadStats();
+    } catch (e) {
+      // Revert optimistic update on error
+      if (index != -1) {
         _todos[index] = _todos[index].copyWith(
           isCompleted: !_todos[index].isCompleted,
         );
         _applyFilters();
         notifyListeners();
-        _setError('Failed to toggle todo: $e');
-
-        if (kDebugMode) {
-          print('Toggle todo error: $e');
-        }
       }
+      _setError('Failed to toggle todo: $e');
     }
   }
 
@@ -250,219 +185,97 @@ class TodoProvider with ChangeNotifier {
     Todo? deletedTodo;
     int? deletedIndex;
 
-    // Optimistic delete
+    final index = _todos.indexWhere((todo) => todo.id == id);
+    if (index != -1) {
+      deletedTodo = _todos[index];
+      deletedIndex = index;
+      _todos.removeAt(index);
+
+      // Cancel all notifications for this todo
+      await _notificationService.cancelAllNotificationsForTodo(id);
+
+      _applyFilters();
+      notifyListeners();
+    }
+
     try {
-      deletedIndex = _todos.indexWhere((todo) => todo.id == id);
-      if (deletedIndex != -1) {
-        deletedTodo = _todos[deletedIndex];
-        _todos.removeAt(deletedIndex);
-
-        // Cancel any pending notifications
-        await _notificationService.cancelReminderNotification(id);
-
-        _applyFilters();
-        notifyListeners();
-      }
-
       await _todoService.deleteTodo(id);
       await loadStats();
-
-      if (kDebugMode) {
-        print('Todo deleted successfully: ${deletedTodo?.title}');
-      }
     } catch (e) {
-      // Revert optimistic delete on error
       if (deletedTodo != null && deletedIndex != null) {
         _todos.insert(deletedIndex, deletedTodo);
         _applyFilters();
         notifyListeners();
       }
       _setError('Failed to delete todo: $e');
-
-      if (kDebugMode) {
-        print('Delete todo error: $e');
-      }
     }
   }
 
-  // Bulk delete todos
+  // FIXED: Enhanced search functionality with better performance and accuracy
+  Future<void> searchTodos(String query) async {
+    _searchQuery = query.trim(); // Remove leading/trailing whitespace
+    _applyFilters();
+    notifyListeners();
+  }
+
+  // Filter methods
+  void setStatusFilter(String status) {
+    _filterStatus = status;
+    _applyFilters();
+    notifyListeners();
+  }
+
+  void setPriorityFilter(String priority) {
+    _filterPriority = priority;
+    _applyFilters();
+    notifyListeners();
+  }
+
+  void clearFilters() {
+    _searchQuery = '';
+    _filterStatus = 'all';
+    _filterPriority = 'all';
+    _applyFilters();
+    notifyListeners();
+  }
+
+  // Bulk operations
   Future<void> deleteMultipleTodos(List<String> ids) async {
-    _setLoading(true);
-    _clearError();
-
-    final List<Todo> deletedTodos = [];
-    final List<int> deletedIndices = [];
-
     try {
-      // Optimistic delete
-      for (final id in ids) {
-        final index = _todos.indexWhere((todo) => todo.id == id);
-        if (index != -1) {
-          deletedTodos.add(_todos[index]);
-          deletedIndices.add(index);
-        }
-      }
-
-      // Remove in reverse order to maintain indices
-      deletedIndices.sort((a, b) => b.compareTo(a));
-      for (final index in deletedIndices) {
-        _todos.removeAt(index);
-      }
-
-      // Cancel notifications
-      for (final id in ids) {
-        await _notificationService.cancelReminderNotification(id);
-      }
-
-      _applyFilters();
-      notifyListeners();
-
       await _todoService.deleteMultipleTodos(ids);
-      await loadStats();
 
-      if (kDebugMode) {
-        print('Multiple todos deleted successfully: ${ids.length} items');
+      // Cancel notifications for deleted todos
+      for (final id in ids) {
+        await _notificationService.cancelAllNotificationsForTodo(id);
       }
-    } catch (e) {
-      // Revert optimistic deletes on error
-      for (int i = 0; i < deletedTodos.length; i++) {
-        _todos.insert(deletedIndices[i], deletedTodos[i]);
-      }
+
+      _todos.removeWhere((todo) => ids.contains(todo.id));
       _applyFilters();
+      await loadStats();
       notifyListeners();
+    } catch (e) {
       _setError('Failed to delete todos: $e');
-
-      if (kDebugMode) {
-        print('Bulk delete error: $e');
-      }
-    } finally {
-      _setLoading(false);
     }
   }
 
-  // Bulk toggle todos
   Future<void> toggleMultipleTodos(List<String> ids, bool isCompleted) async {
-    _setLoading(true);
-    _clearError();
-
-    final Map<String, bool> originalStates = {};
-
     try {
-      // Store original states for potential revert
-      for (final id in ids) {
-        final todo = _todos.firstWhere((t) => t.id == id);
-        originalStates[id] = todo.isCompleted;
-      }
+      await _todoService.toggleMultipleTodos(ids, isCompleted);
 
-      // Optimistic update
       for (int i = 0; i < _todos.length; i++) {
         if (ids.contains(_todos[i].id)) {
           _todos[i] = _todos[i].copyWith(
             isCompleted: isCompleted,
             updatedAt: DateTime.now(),
           );
-
-          // Handle notifications
-          if (isCompleted) {
-            await _notificationService.cancelReminderNotification(_todos[i].id);
-          } else if (_todos[i].dueDate != null) {
-            await _notificationService.scheduleReminderNotification(_todos[i]);
-          }
         }
       }
 
       _applyFilters();
-      notifyListeners();
-
-      await _todoService.toggleMultipleTodos(ids, isCompleted);
       await loadStats();
-
-      if (kDebugMode) {
-        print('Multiple todos toggled successfully: ${ids.length} items');
-      }
-    } catch (e) {
-      // Revert optimistic updates on error
-      for (int i = 0; i < _todos.length; i++) {
-        if (ids.contains(_todos[i].id)) {
-          final originalState = originalStates[_todos[i].id];
-          if (originalState != null) {
-            _todos[i] = _todos[i].copyWith(isCompleted: originalState);
-          }
-        }
-      }
-      _applyFilters();
       notifyListeners();
-      _setError('Failed to toggle todos: $e');
-
-      if (kDebugMode) {
-        print('Bulk toggle error: $e');
-      }
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Search todos
-  Future<void> searchTodos(String query) async {
-    _searchQuery = query;
-
-    if (query.isEmpty) {
-      _applyFilters();
-    } else {
-      _setLoading(true);
-      _clearError();
-
-      try {
-        final searchResults = await _todoService.searchTodos(query);
-        _filteredTodos = searchResults;
-        notifyListeners();
-
-        if (kDebugMode) {
-          print(
-              'Search completed: ${searchResults.length} results for "$query"');
-        }
-      } catch (e) {
-        _setError('Failed to search todos: $e');
-
-        if (kDebugMode) {
-          print('Search error: $e');
-        }
-      } finally {
-        _setLoading(false);
-      }
-    }
-  }
-
-  // Set filters - Updated method names to match home_screen.dart
-  void setFilter({String? status, String? priority}) {
-    if (status != null) _filterStatus = status;
-    if (priority != null) _filterPriority = priority;
-    _applyFilters();
-
-    if (kDebugMode) {
-      print(
-          'Filters applied: status=$_filterStatus, priority=$_filterPriority');
-    }
-  }
-
-  // Individual filter methods for backward compatibility
-  void setStatusFilter(String status) {
-    setFilter(status: status);
-  }
-
-  void setPriorityFilter(String priority) {
-    setFilter(priority: priority);
-  }
-
-  // Clear filters
-  void clearFilters() {
-    _filterStatus = 'all';
-    _filterPriority = 'all';
-    _searchQuery = '';
-    _applyFilters();
-
-    if (kDebugMode) {
-      print('All filters cleared');
+    } catch (e) {
+      _setError('Failed to update todos: $e');
     }
   }
 
@@ -470,251 +283,157 @@ class TodoProvider with ChangeNotifier {
   Future<void> loadStats() async {
     try {
       _stats = await _todoService.getStats();
-      notifyListeners();
 
-      if (kDebugMode) {
-        print('Stats loaded: ${_stats.toString()}');
-      }
+      // Add additional statistics
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final thisWeek = now.subtract(Duration(days: now.weekday - 1));
+
+      final todayTodos = _todos.where((todo) =>
+          todo.createdAt.isAfter(today) ||
+          (todo.updatedAt != null && todo.updatedAt!.isAfter(today)));
+
+      final completedToday =
+          todayTodos.where((todo) => todo.isCompleted).length;
+      final completedThisWeek = _todos
+          .where((todo) =>
+              todo.isCompleted &&
+              todo.updatedAt != null &&
+              todo.updatedAt!.isAfter(thisWeek))
+          .length;
+
+      final averageCompletionTime = _calculateAverageCompletionTime();
+      final mostProductiveHour = _getMostProductiveHour();
+
+      _stats.addAll({
+        'completedToday': completedToday,
+        'completedThisWeek': completedThisWeek,
+        'averageCompletionTime': averageCompletionTime,
+        'mostProductiveHour': mostProductiveHour,
+        'streakDays': _calculateStreakDays(),
+      });
     } catch (e) {
-      _setError('Failed to load statistics: $e');
-
-      if (kDebugMode) {
-        print('Load stats error: $e');
-      }
+      print('Failed to load stats: $e');
     }
-  }
-
-  // Refresh data
-  Future<void> refresh() async {
-    _clearError();
-    await loadTodos();
-    await loadStats();
-
-    if (kDebugMode) {
-      print('Data refreshed successfully');
-    }
-  }
-
-  // Clear all data (for testing or reset)
-  Future<void> clearAllData() async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      await _todoService.clearAllData();
-      _todos.clear();
-      _filteredTodos.clear();
-      _stats.clear();
-
-      // Cancel all notifications
-      for (final todo in _todos) {
-        await _notificationService.cancelReminderNotification(todo.id);
-      }
-
-      notifyListeners();
-
-      if (kDebugMode) {
-        print('All data cleared successfully');
-      }
-    } catch (e) {
-      _setError('Failed to clear data: $e');
-
-      if (kDebugMode) {
-        print('Clear data error: $e');
-      }
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Export todos (for backup)
-  List<Map<String, dynamic>> exportTodos() {
-    try {
-      final exportData = _todos.map((todo) => todo.toMap()).toList();
-
-      if (kDebugMode) {
-        print('Exported ${exportData.length} todos');
-      }
-
-      return exportData;
-    } catch (e) {
-      _setError('Failed to export todos: $e');
-
-      if (kDebugMode) {
-        print('Export error: $e');
-      }
-
-      return [];
-    }
-  }
-
-  // Import todos (for restore)
-  Future<void> importTodos(List<Map<String, dynamic>> todosData) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // Clear existing data
-      await clearAllData();
-
-      // Import new data
-      for (final todoMap in todosData) {
-        final todo = Todo.fromMap(todoMap);
-        await _todoService.addTodo(todo);
-      }
-
-      await loadTodos();
-      await loadStats();
-
-      if (kDebugMode) {
-        print('Imported ${todosData.length} todos successfully');
-      }
-    } catch (e) {
-      _setError('Failed to import todos: $e');
-
-      if (kDebugMode) {
-        print('Import error: $e');
-      }
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Get productivity insights
-  Map<String, dynamic> getProductivityInsights() {
-    if (_todos.isEmpty) {
-      return {
-        'totalTasks': 0,
-        'completionRate': 0.0,
-        'averageTasksPerDay': 0.0,
-        'mostProductiveDay': 'N/A',
-        'priorityDistribution': {},
-        'overdueTasks': 0,
-      };
-    }
-
-    final now = DateTime.now();
-    final last7Days = now.subtract(const Duration(days: 7));
-    final recentTodos =
-        _todos.where((todo) => todo.createdAt.isAfter(last7Days)).toList();
-
-    // Calculate priority distribution
-    final priorityCount = <String, int>{};
-    for (final todo in _todos) {
-      priorityCount[todo.priority] = (priorityCount[todo.priority] ?? 0) + 1;
-    }
-
-    // Calculate average tasks per day
-    final daysSinceFirstTodo = _todos.isEmpty
-        ? 1
-        : now
-            .difference(_todos
-                .map((t) => t.createdAt)
-                .reduce((a, b) => a.isBefore(b) ? a : b))
-            .inDays
-            .clamp(1, double.infinity);
-
-    final averageTasksPerDay = _todos.length / daysSinceFirstTodo;
-
-    return {
-      'totalTasks': _todos.length,
-      'completionRate': completionRate,
-      'averageTasksPerDay': averageTasksPerDay,
-      'recentTasks': recentTodos.length,
-      'priorityDistribution': priorityCount,
-      'overdueTasks': overdueTodos.length,
-      'todaysTasks': todaysTodos.length,
-      'upcomingTasks': upcomingTodos.length,
-      'highPriorityTasks': highPriorityTodos.length,
-    };
   }
 
   // Private helper methods
   void _applyFilters() {
-    List<Todo> filtered = List.from(_todos);
+    _filteredTodos = _todos.where((todo) {
+      // FIXED: Enhanced search filter with better matching
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final titleMatch = todo.title.toLowerCase().contains(query);
+        final descriptionMatch = todo.description.toLowerCase().contains(query);
+        final priorityMatch = todo.priority.toLowerCase().contains(query);
 
-    // Apply status filter
-    if (_filterStatus != 'all') {
-      if (_filterStatus == 'completed') {
-        filtered = filtered.where((todo) => todo.isCompleted).toList();
-      } else if (_filterStatus == 'pending') {
-        filtered = filtered.where((todo) => !todo.isCompleted).toList();
-      }
-    }
+        // FIXED: Check voice note duration properly using existing getter
+        bool voiceNoteMatch = false;
+        if (todo.hasVoiceNote && todo.voiceNoteDuration != null) {
+          final minutes = todo.voiceNoteDuration!.inMinutes;
+          final seconds = todo.voiceNoteDuration!.inSeconds % 60;
+          final formattedDuration =
+              '${minutes}:${seconds.toString().padLeft(2, '0')}';
+          voiceNoteMatch = formattedDuration.contains(query);
+        }
 
-    // Apply priority filter
-    if (_filterPriority != 'all') {
-      filtered =
-          filtered.where((todo) => todo.priority == _filterPriority).toList();
-    }
-
-    // Apply search filter
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered = filtered.where((todo) {
-        return todo.title.toLowerCase().contains(query) ||
-            todo.description.toLowerCase().contains(query);
-      }).toList();
-    }
-
-    // Sort by priority and creation date
-    filtered.sort((a, b) {
-      // First sort by completion status (pending first)
-      if (a.isCompleted != b.isCompleted) {
-        return a.isCompleted ? 1 : -1;
+        // Match any of the fields
+        if (!titleMatch &&
+            !descriptionMatch &&
+            !priorityMatch &&
+            !voiceNoteMatch) {
+          return false;
+        }
       }
 
-      // Then by priority (high, medium, low)
-      final priorityOrder = ['high', 'medium', 'low'];
-      final aPriorityIndex = priorityOrder.indexOf(a.priority);
-      final bPriorityIndex = priorityOrder.indexOf(b.priority);
+      // Status filter
+      if (_filterStatus == 'completed' && !todo.isCompleted) return false;
+      if (_filterStatus == 'pending' && todo.isCompleted) return false;
 
-      if (aPriorityIndex != bPriorityIndex) {
-        return aPriorityIndex.compareTo(bPriorityIndex);
-      }
+      // Priority filter
+      if (_filterPriority != 'all' && todo.priority != _filterPriority)
+        return false;
 
-      // Then by due date (earliest first)
-      if (a.dueDate != null && b.dueDate != null) {
-        return a.dueDate!.compareTo(b.dueDate!);
-      } else if (a.dueDate != null) {
-        return -1; // a has due date, b doesn't
-      } else if (b.dueDate != null) {
-        return 1; // b has due date, a doesn't
-      }
+      return true;
+    }).toList();
 
-      // Finally by creation date (newest first)
+    // Sort by creation date (newest first), but completed todos at bottom
+    _filteredTodos.sort((a, b) {
+      if (a.isCompleted && !b.isCompleted) return 1;
+      if (!a.isCompleted && b.isCompleted) return -1;
       return b.createdAt.compareTo(a.createdAt);
     });
-
-    _filteredTodos = filtered;
-    notifyListeners();
   }
 
-  void _setLoading(bool loading) {
-    if (_isLoading != loading) {
-      _isLoading = loading;
-      notifyListeners();
+  double _calculateAverageCompletionTime() {
+    final completedTodos = _todos
+        .where((todo) => todo.isCompleted && todo.updatedAt != null)
+        .toList();
+
+    if (completedTodos.isEmpty) return 0.0;
+
+    final totalHours = completedTodos.fold<double>(0, (sum, todo) {
+      final duration = todo.updatedAt!.difference(todo.createdAt);
+      return sum + duration.inHours;
+    });
+
+    return totalHours / completedTodos.length;
+  }
+
+  int _getMostProductiveHour() {
+    final hourCounts = <int, int>{};
+
+    for (final todo in _todos.where(
+      (t) => t.isCompleted && t.updatedAt != null,
+    )) {
+      final hour = todo.updatedAt!.hour;
+      hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
     }
+
+    if (hourCounts.isEmpty) return 9; // Default to 9 AM
+
+    return hourCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+  }
+
+  int _calculateStreakDays() {
+    if (_todos.isEmpty) return 0;
+
+    final now = DateTime.now();
+    var currentDate = DateTime(now.year, now.month, now.day);
+    var streakDays = 0;
+
+    for (int i = 0; i < 30; i++) {
+      final hasCompletedTodo = _todos.any((todo) =>
+          todo.isCompleted &&
+          todo.updatedAt != null &&
+          todo.updatedAt!.year == currentDate.year &&
+          todo.updatedAt!.month == currentDate.month &&
+          todo.updatedAt!.day == currentDate.day);
+
+      if (hasCompletedTodo) {
+        streakDays++;
+      } else if (i > 0) {
+        // Break streak if no completed todos found (except for today)
+        break;
+      }
+
+      currentDate = currentDate.subtract(const Duration(days: 1));
+    }
+
+    return streakDays;
+  }
+
+  // Utility methods
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+  }
+
+  void _clearError() {
+    _error = null;
   }
 
   void _setError(String error) {
     _error = error;
-    notifyListeners();
-  }
-
-  void _clearError() {
-    if (_error != null) {
-      _error = null;
-      notifyListeners();
-    }
-  }
-
-  @override
-  void dispose() {
-    // Clean up any resources if needed
-    if (kDebugMode) {
-      print('TodoProvider disposed');
-    }
-    super.dispose();
+    print('TodoProvider Error: $error');
   }
 }
