@@ -5,14 +5,18 @@ import 'providers/todo_provider.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
 import 'services/notification_service.dart';
-import 'services/voice_note_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize services
-  await NotificationService().initialize();
-  await VoiceNoteService().initialize();
+  // Initialize notification service
+  try {
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+    print('✅ Notification service initialized in main');
+  } catch (e) {
+    print('❌ Error initializing notification service in main: $e');
+  }
 
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
@@ -80,7 +84,7 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
 
     _animationController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 2000),
       vsync: this,
     );
 
@@ -89,7 +93,7 @@ class _SplashScreenState extends State<SplashScreen>
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeInOut,
+      curve: const Interval(0.0, 0.7, curve: Curves.easeInOut),
     ));
 
     _scaleAnimation = Tween<double>(
@@ -97,13 +101,13 @@ class _SplashScreenState extends State<SplashScreen>
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _animationController,
-      curve: Curves.elasticOut,
+      curve: const Interval(0.0, 0.7, curve: Curves.elasticOut),
     ));
 
     _animationController.forward();
 
-    // Navigate to home screen after splash
-    Future.delayed(const Duration(seconds: 3), () {
+    // Navigate to home screen after animation
+    Future.delayed(const Duration(milliseconds: 3000), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
@@ -113,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen>
                 (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
-            transitionDuration: const Duration(milliseconds: 500),
+            transitionDuration: const Duration(milliseconds: 800),
           ),
         );
       }
@@ -128,23 +132,16 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDarkMode
-                ? [
-                    const Color(0xFF1E1E1E),
-                    const Color(0xFF121212),
-                  ]
-                : [
-                    AppTheme.primaryColor,
-                    AppTheme.accentColor,
-                  ],
+            colors: [
+              AppTheme.primaryColor,
+              AppTheme.secondaryColor,
+            ],
           ),
         ),
         child: Center(
@@ -158,64 +155,51 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // App Icon
                       Container(
                         width: 120,
                         height: 120,
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3),
+                            width: 2,
+                          ),
                         ),
-                        child: Icon(
-                          Icons.check_circle_rounded,
+                        child: const Icon(
+                          Icons.check_circle_outline,
                           size: 60,
-                          color: AppTheme.primaryColor,
+                          color: Colors.white,
                         ),
                       ),
-
-                      const SizedBox(height: 30),
-
-                      // App Name
-                      Text(
+                      const SizedBox(height: 32),
+                      const Text(
                         'Re-Todo',
                         style: TextStyle(
-                          fontSize: 32,
+                          fontSize: 36,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          letterSpacing: 1.2,
+                          letterSpacing: 2,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
-                      // Tagline
                       Text(
                         'Your Personal Task Manager',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.white.withOpacity(0.9),
-                          letterSpacing: 0.5,
+                          letterSpacing: 1,
                         ),
                       ),
-
-                      const SizedBox(height: 50),
-
-                      // Loading Indicator
+                      const SizedBox(height: 48),
                       SizedBox(
                         width: 40,
                         height: 40,
                         child: CircularProgressIndicator(
-                          strokeWidth: 3,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white.withOpacity(0.8),
+                            Colors.white.withOpacity(0.7),
                           ),
+                          strokeWidth: 3,
                         ),
                       ),
                     ],

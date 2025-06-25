@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 class Todo {
   String id;
   String title;
@@ -25,11 +23,24 @@ class Todo {
     this.voiceNoteDuration,
   });
 
-  // Helper method to check if todo has voice note
-  bool get hasVoiceNote => voiceNotePath != null && voiceNotePath!.isNotEmpty;
-
   // Convert Todo to Map (similar to MongoDB document)
   Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'title': title,
+      'description': description,
+      'isCompleted': isCompleted,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
+      'dueDate': dueDate?.toIso8601String(),
+      'priority': priority,
+      'voiceNotePath': voiceNotePath,
+      'voiceNoteDuration': voiceNoteDuration?.inMilliseconds,
+    };
+  }
+
+  // ADDED: Convert Todo to JSON Map for SharedPreferences storage
+  Map<String, dynamic> toJson() {
     return {
       'id': id,
       'title': title,
@@ -63,6 +74,25 @@ class Todo {
     );
   }
 
+  // ADDED: Create Todo from JSON Map for SharedPreferences storage
+  factory Todo.fromJson(Map<String, dynamic> json) {
+    return Todo(
+      id: json['id'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      isCompleted: json['isCompleted'] ?? false,
+      createdAt: DateTime.parse(json['createdAt']),
+      updatedAt:
+          json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+      dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,
+      priority: json['priority'] ?? 'medium',
+      voiceNotePath: json['voiceNotePath'],
+      voiceNoteDuration: json['voiceNoteDuration'] != null
+          ? Duration(milliseconds: json['voiceNoteDuration'])
+          : null,
+    );
+  }
+
   // Create a copy with updated fields (similar to spread operator in JS)
   Todo copyWith({
     String? id,
@@ -90,45 +120,28 @@ class Todo {
     );
   }
 
-  // Convert to JSON string
-  String toJson() => jsonEncode(toMap());
+  // Check if todo has voice note
+  bool get hasVoiceNote => voiceNotePath != null && voiceNotePath!.isNotEmpty;
 
-  // Create from JSON string
-  factory Todo.fromJson(String source) => Todo.fromMap(jsonDecode(source));
+  // Get formatted voice note duration
+  String get formattedVoiceNoteDuration {
+    if (voiceNoteDuration == null) return '';
+    final minutes = voiceNoteDuration!.inMinutes;
+    final seconds = voiceNoteDuration!.inSeconds % 60;
+    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+  }
 
   @override
   String toString() {
-    return 'Todo(id: $id, title: $title, description: $description, isCompleted: $isCompleted, createdAt: $createdAt, updatedAt: $updatedAt, dueDate: $dueDate, priority: $priority, voiceNotePath: $voiceNotePath, voiceNoteDuration: $voiceNoteDuration)';
+    return 'Todo{id: $id, title: $title, isCompleted: $isCompleted, hasVoiceNote: $hasVoiceNote}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-
-    return other is Todo &&
-        other.id == id &&
-        other.title == title &&
-        other.description == description &&
-        other.isCompleted == isCompleted &&
-        other.createdAt == createdAt &&
-        other.updatedAt == updatedAt &&
-        other.dueDate == dueDate &&
-        other.priority == priority &&
-        other.voiceNotePath == voiceNotePath &&
-        other.voiceNoteDuration == voiceNoteDuration;
+    return other is Todo && other.id == id;
   }
 
   @override
-  int get hashCode {
-    return id.hashCode ^
-        title.hashCode ^
-        description.hashCode ^
-        isCompleted.hashCode ^
-        createdAt.hashCode ^
-        updatedAt.hashCode ^
-        dueDate.hashCode ^
-        priority.hashCode ^
-        voiceNotePath.hashCode ^
-        voiceNoteDuration.hashCode;
-  }
+  int get hashCode => id.hashCode;
 }
