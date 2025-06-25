@@ -7,6 +7,7 @@ import '../widgets/search_bar_widget.dart';
 import '../widgets/stats_card.dart';
 import '../screens/add_todo_screen.dart';
 import '../screens/timeline_screen.dart';
+import '../screens/chatbot_screen.dart'; // NEW: Add ChatBot Screen import
 import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -52,27 +53,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
         actions: [
           IconButton(
-            icon: Icon(_showStats ? Icons.list : Icons.analytics),
+            icon: Icon(_showStats ? Icons.visibility_off : Icons.analytics),
             onPressed: () {
               setState(() {
                 _showStats = !_showStats;
               });
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.timeline),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const TimelineScreen()),
-              );
-            },
+            tooltip: _showStats ? 'Hide Stats' : 'Show Stats',
           ),
           PopupMenuButton<String>(
             onSelected: _handleMenuAction,
-            icon: const Icon(Icons.more_vert),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'refresh',
@@ -94,14 +84,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-              const PopupMenuDivider(),
               const PopupMenuItem(
                 value: 'timeline',
                 child: Row(
                   children: [
                     Icon(Icons.timeline),
                     SizedBox(width: 8),
-                    Text('View Timeline'),
+                    Text('Timeline'),
                   ],
                 ),
               ),
@@ -110,83 +99,62 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ],
         bottom: TabBar(
           controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
           tabs: const [
-            Tab(text: 'All', icon: Icon(Icons.list_alt)),
-            Tab(text: 'Pending', icon: Icon(Icons.radio_button_unchecked)),
-            Tab(text: 'Completed', icon: Icon(Icons.check_circle)),
-            Tab(text: 'Search', icon: Icon(Icons.search)),
+            Tab(icon: Icon(Icons.list), text: 'All'),
+            Tab(icon: Icon(Icons.radio_button_unchecked), text: 'Pending'),
+            Tab(icon: Icon(Icons.check_circle), text: 'Completed'),
+            Tab(icon: Icon(Icons.search), text: 'Search'),
           ],
         ),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppTheme.lightPink.withOpacity(0.3), Colors.white],
-          ),
-        ),
-        child: Consumer<TodoProvider>(
-          builder: (context, todoProvider, child) {
-            if (todoProvider.isLoading) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppTheme.primaryColor,
+      body: Consumer<TodoProvider>(
+        builder: (context, todoProvider, child) {
+          if (todoProvider.isLoading && todoProvider.todos.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading your todos...',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: AppTheme.primaryColor,
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Loading your todos...',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (todoProvider.error != null) {
+            return _buildErrorState(todoProvider);
+          }
+
+          return Column(
+            children: [
+              if (_showStats) const StatsCard(),
+              _buildFilterChips(todoProvider),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildTodoList(todoProvider, 'all'),
+                    _buildTodoList(todoProvider, 'pending'),
+                    _buildTodoList(todoProvider, 'completed'),
+                    _buildSearchTab(todoProvider),
                   ],
                 ),
-              );
-            }
-
-            if (todoProvider.error != null) {
-              return _buildErrorState(todoProvider);
-            }
-
-            return Column(
-              children: [
-                if (_showStats) const StatsCard(),
-                _buildFilterChips(todoProvider),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildTodoList(todoProvider, 'all'),
-                      _buildTodoList(todoProvider, 'pending'),
-                      _buildTodoList(todoProvider, 'completed'),
-                      _buildSearchTab(todoProvider),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
       floatingActionButton: _buildFloatingActionButton(),
     );
@@ -227,17 +195,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Text(
               'Oops! Something went wrong',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppTheme.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               todoProvider.error ?? 'Unknown error occurred',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[600],
+                  ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -298,30 +266,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               'High Priority',
               todoProvider.filterPriority == 'high',
               () => todoProvider.setPriorityFilter('high'),
-              color: AppTheme.highPriority,
+              icon: Icons.priority_high,
+              color: AppTheme.errorColor,
             ),
             const SizedBox(width: 8),
             _buildFilterChip(
               'Medium Priority',
               todoProvider.filterPriority == 'medium',
               () => todoProvider.setPriorityFilter('medium'),
-              color: AppTheme.mediumPriority,
+              icon: Icons.remove,
+              color: AppTheme.warningColor,
             ),
             const SizedBox(width: 8),
             _buildFilterChip(
               'Low Priority',
               todoProvider.filterPriority == 'low',
               () => todoProvider.setPriorityFilter('low'),
-              color: AppTheme.lowPriority,
+              icon: Icons.low_priority,
+              color: AppTheme.successColor,
             ),
 
             const SizedBox(width: 16),
-
-            // Clear filters button
-            if (todoProvider.filterStatus != 'all' ||
-                todoProvider.filterPriority != 'all' ||
-                todoProvider.searchQuery.isNotEmpty)
+            if (todoProvider.hasActiveFilters) ...[
+              Container(width: 1, height: 30, color: AppTheme.softPink),
+              const SizedBox(width: 16),
               _buildClearFiltersButton(todoProvider),
+            ],
           ],
         ),
       ),
@@ -436,22 +406,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     switch (filter) {
       case 'pending':
-        message = 'All caught up! 🎉';
-        submessage = 'No pending todos.\nYou\'re doing amazing!';
+        message = 'All caught up!';
+        submessage = 'You have no pending tasks. Great job!';
         icon = Icons.celebration;
         iconColor = AppTheme.successColor;
         break;
       case 'completed':
-        message = 'No completed todos yet';
-        submessage = 'Start checking off your tasks\nto see them here!';
-        icon = Icons.assignment_turned_in_outlined;
-        iconColor = AppTheme.softPink;
+        message = 'No completed tasks yet';
+        submessage = 'Start completing some tasks to see them here!';
+        icon = Icons.assignment_turned_in;
+        iconColor = AppTheme.primaryColor;
         break;
       default:
-        message = 'Ready for a fresh start?';
-        submessage = 'Create your first todo\nand begin your journey!';
-        icon = Icons.rocket_launch;
-        iconColor = AppTheme.primaryColor;
+        message = 'No todos yet';
+        submessage =
+            'Create your first todo to get started on your productivity journey!';
+        icon = Icons.add_task;
+        iconColor = AppTheme.accentColor;
     }
 
     return Center(
@@ -463,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryColor.withOpacity(0.1),
+              color: iconColor.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -478,23 +449,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 color: iconColor.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 48, color: iconColor),
+              child: Icon(
+                icon,
+                size: 48,
+                color: iconColor,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               message,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppTheme.primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                  ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               submessage,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[600],
+                  ),
               textAlign: TextAlign.center,
             ),
             if (filter == 'all') ...[
@@ -518,13 +493,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // NEW: Updated Floating Action Button with ChatBot
   Widget _buildFloatingActionButton() {
-    return FloatingActionButton.extended(
-      onPressed: _addNewTodo,
-      icon: const Icon(Icons.add),
-      label: const Text('Add Todo'),
-      backgroundColor: AppTheme.accentColor,
-      foregroundColor: Colors.white,
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // NEW: ChatBot FAB
+        FloatingActionButton(
+          heroTag: "chatbot_fab",
+          mini: true,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const ChatBotScreen()),
+            );
+          },
+          backgroundColor: Colors.orange,
+          child: const Text('🍪', style: TextStyle(fontSize: 16)),
+          tooltip: 'Chat with Cookie',
+        ),
+        const SizedBox(height: 12),
+        // Original Add Todo FAB
+        FloatingActionButton.extended(
+          heroTag: "add_todo_fab",
+          onPressed: _addNewTodo,
+          icon: const Icon(Icons.add),
+          label: const Text('Add Todo'),
+          backgroundColor: AppTheme.accentColor,
+          foregroundColor: Colors.white,
+        ),
+      ],
     );
   }
 
@@ -541,17 +538,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _showSnackBar('Filters cleared', AppTheme.successColor);
         break;
       case 'timeline':
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (context) => const TimelineScreen()));
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => const TimelineScreen()),
+        );
         break;
     }
   }
 
   void _addNewTodo() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const AddTodoScreen()));
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const AddTodoScreen()),
+    );
   }
 
   void _editTodo(Todo todo) {
@@ -586,21 +583,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Navigator.of(context).pop();
               _showSnackBar('Todo deleted', AppTheme.errorColor);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-            ),
-            child: const Text('Delete'),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  void _showSnackBar(String message, Color color) {
+  void _showSnackBar(String message, Color backgroundColor) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: color,
+        backgroundColor: backgroundColor,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),

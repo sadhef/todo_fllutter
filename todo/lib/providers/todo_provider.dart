@@ -27,6 +27,13 @@ class TodoProvider with ChangeNotifier {
   String get filterPriority => _filterPriority;
   Map<String, dynamic> get stats => _stats;
 
+  // NEW: Add the missing hasActiveFilters getter
+  bool get hasActiveFilters {
+    return _filterStatus != 'all' ||
+        _filterPriority != 'all' ||
+        _searchQuery.isNotEmpty;
+  }
+
   // Computed getters
   int get totalTodos => _todos.length;
   int get completedTodos => _todos.where((todo) => todo.isCompleted).length;
@@ -86,7 +93,7 @@ class TodoProvider with ChangeNotifier {
     }
   }
 
-  // Add todo
+  // Add todo - FIXED: Use existing notification methods
   Future<void> addTodo(Todo todo) async {
     _setLoading(true);
     _clearError();
@@ -95,7 +102,7 @@ class TodoProvider with ChangeNotifier {
       final newTodo = await _todoService.addTodo(todo);
       _todos.add(newTodo);
 
-      // Schedule notification if todo has due date
+      // FIXED: Use existing scheduleReminderNotification method
       if (newTodo.dueDate != null && !newTodo.isCompleted) {
         await _notificationService.scheduleReminderNotification(newTodo);
       }
@@ -110,18 +117,15 @@ class TodoProvider with ChangeNotifier {
     }
   }
 
-  // Update todo
+  // Update todo - FIXED: Use existing notification methods
   Future<void> updateTodo(String id, Todo updatedTodo) async {
-    _setLoading(true);
-    _clearError();
-
     try {
       final updated = await _todoService.updateTodo(id, updatedTodo);
       final index = _todos.indexWhere((todo) => todo.id == id);
       if (index != -1) {
         _todos[index] = updated;
 
-        // Update notification
+        // FIXED: Use existing updateReminderNotification method
         await _notificationService.updateReminderNotification(updated);
 
         _applyFilters();
@@ -130,58 +134,45 @@ class TodoProvider with ChangeNotifier {
       }
     } catch (e) {
       _setError('Failed to update todo: $e');
-    } finally {
-      _setLoading(false);
     }
   }
 
-  // Toggle todo completion
+  // Toggle todo completion - FIXED: Use existing notification methods
   Future<void> toggleTodo(String id) async {
-    final index = _todos.indexWhere((todo) => todo.id == id);
-    if (index != -1) {
-      final wasCompleted = _todos[index].isCompleted;
-      _todos[index] = _todos[index].copyWith(
-        isCompleted: !_todos[index].isCompleted,
+    try {
+      final index = _todos.indexWhere((todo) => todo.id == id);
+      if (index == -1) return;
+
+      final todo = _todos[index];
+      final updatedTodo = todo.copyWith(
+        isCompleted: !todo.isCompleted,
         updatedAt: DateTime.now(),
       );
 
-      // Show completion celebration if newly completed
-      if (!wasCompleted && _todos[index].isCompleted) {
-        await _notificationService.scheduleCompletionNotification(
-          _todos[index],
-        );
-        await _notificationService.cancelReminderNotification(_todos[index].id);
-      } else if (wasCompleted && !_todos[index].isCompleted) {
-        // Reschedule reminder if uncompleted and has due date
-        if (_todos[index].dueDate != null) {
-          await _notificationService.scheduleReminderNotification(
-            _todos[index],
-          );
-        }
+      await _todoService.updateTodo(id, updatedTodo);
+      _todos[index] = updatedTodo;
+
+      // FIXED: Use existing notification methods
+      if (updatedTodo.isCompleted) {
+        // Cancel reminders and show completion celebration
+        await _notificationService.cancelReminderNotification(id);
+        await _notificationService.scheduleCompletionNotification(updatedTodo);
+      } else if (updatedTodo.dueDate != null) {
+        // Reschedule reminders for uncompleted todo
+        await _notificationService.scheduleReminderNotification(updatedTodo);
       }
 
       _applyFilters();
-      notifyListeners();
-    }
-
-    try {
-      await _todoService.toggleTodo(id);
       await loadStats();
+      notifyListeners();
     } catch (e) {
-      // Revert optimistic update on error
-      if (index != -1) {
-        _todos[index] = _todos[index].copyWith(
-          isCompleted: !_todos[index].isCompleted,
-        );
-        _applyFilters();
-        notifyListeners();
-      }
       _setError('Failed to toggle todo: $e');
     }
   }
 
-  // Delete todo
+  // Delete todo - FIXED: Use existing notification methods
   Future<void> deleteTodo(String id) async {
+    // Optimistically remove from UI
     Todo? deletedTodo;
     int? deletedIndex;
 
@@ -191,7 +182,7 @@ class TodoProvider with ChangeNotifier {
       deletedIndex = index;
       _todos.removeAt(index);
 
-      // Cancel all notifications for this todo
+      // FIXED: Use existing cancelAllNotificationsForTodo method
       await _notificationService.cancelAllNotificationsForTodo(id);
 
       _applyFilters();
@@ -202,6 +193,7 @@ class TodoProvider with ChangeNotifier {
       await _todoService.deleteTodo(id);
       await loadStats();
     } catch (e) {
+      // Rollback on error
       if (deletedTodo != null && deletedIndex != null) {
         _todos.insert(deletedIndex, deletedTodo);
         _applyFilters();
@@ -211,14 +203,14 @@ class TodoProvider with ChangeNotifier {
     }
   }
 
-  // FIXED: Enhanced search functionality with better performance and accuracy
+  // NEW: Search functionality
   Future<void> searchTodos(String query) async {
-    _searchQuery = query.trim(); // Remove leading/trailing whitespace
+    _searchQuery = query.trim();
     _applyFilters();
     notifyListeners();
   }
 
-  // Filter methods
+  // NEW: Filter methods
   void setStatusFilter(String status) {
     _filterStatus = status;
     _applyFilters();
@@ -239,12 +231,12 @@ class TodoProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Bulk operations
+  // Bulk operations - FIXED: Use existing notification methods
   Future<void> deleteMultipleTodos(List<String> ids) async {
     try {
       await _todoService.deleteMultipleTodos(ids);
 
-      // Cancel notifications for deleted todos
+      // FIXED: Cancel notifications for deleted todos using existing method
       for (final id in ids) {
         await _notificationService.cancelAllNotificationsForTodo(id);
       }
@@ -317,52 +309,54 @@ class TodoProvider with ChangeNotifier {
     }
   }
 
-  // Private helper methods
+  // NEW: Apply filters method
   void _applyFilters() {
-    _filteredTodos = _todos.where((todo) {
-      // FIXED: Enhanced search filter with better matching
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
+    List<Todo> filtered = List.from(_todos);
+
+    // Apply status filter
+    if (_filterStatus != 'all') {
+      if (_filterStatus == 'completed') {
+        filtered = filtered.where((todo) => todo.isCompleted).toList();
+      } else if (_filterStatus == 'pending') {
+        filtered = filtered.where((todo) => !todo.isCompleted).toList();
+      }
+    }
+
+    // Apply priority filter
+    if (_filterPriority != 'all') {
+      filtered =
+          filtered.where((todo) => todo.priority == _filterPriority).toList();
+    }
+
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      filtered = filtered.where((todo) {
         final titleMatch = todo.title.toLowerCase().contains(query);
         final descriptionMatch = todo.description.toLowerCase().contains(query);
         final priorityMatch = todo.priority.toLowerCase().contains(query);
 
-        // FIXED: Check voice note duration properly using existing getter
-        bool voiceNoteMatch = false;
-        if (todo.hasVoiceNote && todo.voiceNoteDuration != null) {
-          final minutes = todo.voiceNoteDuration!.inMinutes;
-          final seconds = todo.voiceNoteDuration!.inSeconds % 60;
-          final formattedDuration =
-              '${minutes}:${seconds.toString().padLeft(2, '0')}';
-          voiceNoteMatch = formattedDuration.contains(query);
-        }
+        return titleMatch || descriptionMatch || priorityMatch;
+      }).toList();
+    }
 
-        // Match any of the fields
-        if (!titleMatch &&
-            !descriptionMatch &&
-            !priorityMatch &&
-            !voiceNoteMatch) {
-          return false;
-        }
-      }
+    _filteredTodos = filtered;
+  }
 
-      // Status filter
-      if (_filterStatus == 'completed' && !todo.isCompleted) return false;
-      if (_filterStatus == 'pending' && todo.isCompleted) return false;
+  // Private helper methods
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
 
-      // Priority filter
-      if (_filterPriority != 'all' && todo.priority != _filterPriority)
-        return false;
+  void _clearError() {
+    _error = null;
+  }
 
-      return true;
-    }).toList();
-
-    // Sort by creation date (newest first), but completed todos at bottom
-    _filteredTodos.sort((a, b) {
-      if (a.isCompleted && !b.isCompleted) return 1;
-      if (!a.isCompleted && b.isCompleted) return -1;
-      return b.createdAt.compareTo(a.createdAt);
-    });
+  void _setError(String error) {
+    _error = error;
+    _isLoading = false;
+    notifyListeners();
   }
 
   double _calculateAverageCompletionTime() {
@@ -372,68 +366,68 @@ class TodoProvider with ChangeNotifier {
 
     if (completedTodos.isEmpty) return 0.0;
 
-    final totalHours = completedTodos.fold<double>(0, (sum, todo) {
-      final duration = todo.updatedAt!.difference(todo.createdAt);
-      return sum + duration.inHours;
-    });
+    double totalHours = 0;
+    for (final todo in completedTodos) {
+      final completionTime = todo.updatedAt!.difference(todo.createdAt).inHours;
+      totalHours += completionTime;
+    }
 
     return totalHours / completedTodos.length;
   }
 
   int _getMostProductiveHour() {
+    final completedTodos = _todos
+        .where((todo) => todo.isCompleted && todo.updatedAt != null)
+        .toList();
+
+    if (completedTodos.isEmpty) return 9; // Default to 9 AM
+
     final hourCounts = <int, int>{};
 
-    for (final todo in _todos.where(
-      (t) => t.isCompleted && t.updatedAt != null,
-    )) {
+    for (final todo in completedTodos) {
       final hour = todo.updatedAt!.hour;
       hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
     }
 
-    if (hourCounts.isEmpty) return 9; // Default to 9 AM
+    int mostProductiveHour = 9;
+    int maxCount = 0;
 
-    return hourCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+    hourCounts.forEach((hour, count) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostProductiveHour = hour;
+      }
+    });
+
+    return mostProductiveHour;
   }
 
   int _calculateStreakDays() {
-    if (_todos.isEmpty) return 0;
-
     final now = DateTime.now();
-    var currentDate = DateTime(now.year, now.month, now.day);
-    var streakDays = 0;
+    final completedTodos = _todos
+        .where((todo) => todo.isCompleted && todo.updatedAt != null)
+        .toList();
 
-    for (int i = 0; i < 30; i++) {
-      final hasCompletedTodo = _todos.any((todo) =>
-          todo.isCompleted &&
-          todo.updatedAt != null &&
-          todo.updatedAt!.year == currentDate.year &&
-          todo.updatedAt!.month == currentDate.month &&
-          todo.updatedAt!.day == currentDate.day);
+    if (completedTodos.isEmpty) return 0;
 
-      if (hasCompletedTodo) {
-        streakDays++;
-      } else if (i > 0) {
-        // Break streak if no completed todos found (except for today)
+    // Sort by completion date (most recent first)
+    completedTodos.sort((a, b) => b.updatedAt!.compareTo(a.updatedAt!));
+
+    int streak = 0;
+    DateTime currentDate = DateTime(now.year, now.month, now.day);
+
+    for (final todo in completedTodos) {
+      final todoDate = DateTime(
+          todo.updatedAt!.year, todo.updatedAt!.month, todo.updatedAt!.day);
+
+      if (todoDate == currentDate) {
+        streak++;
+        currentDate = currentDate.subtract(const Duration(days: 1));
+      } else if (todoDate.isBefore(currentDate)) {
         break;
       }
-
-      currentDate = currentDate.subtract(const Duration(days: 1));
     }
 
-    return streakDays;
-  }
-
-  // Utility methods
-  void _setLoading(bool loading) {
-    _isLoading = loading;
-  }
-
-  void _clearError() {
-    _error = null;
-  }
-
-  void _setError(String error) {
-    _error = error;
-    print('TodoProvider Error: $error');
+    return streak;
   }
 }
