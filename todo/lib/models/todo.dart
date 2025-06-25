@@ -10,6 +10,12 @@ class Todo {
   String? voiceNotePath; // Path to voice note file
   Duration? voiceNoteDuration; // Duration of voice note
 
+  // NEW: Custom reminder times before due date
+  List<Duration>?
+      customReminderTimes; // e.g., [Duration(hours: 2), Duration(minutes: 30)]
+  bool
+      enableDefaultReminders; // Whether to use default 24h, 2h, 15min reminders
+
   Todo({
     required this.id,
     required this.title,
@@ -21,6 +27,9 @@ class Todo {
     this.priority = 'medium',
     this.voiceNotePath,
     this.voiceNoteDuration,
+    this.customReminderTimes,
+    this.enableDefaultReminders =
+        true, // Default to true for backward compatibility
   });
 
   // Convert Todo to Map (similar to MongoDB document)
@@ -36,10 +45,13 @@ class Todo {
       'priority': priority,
       'voiceNotePath': voiceNotePath,
       'voiceNoteDuration': voiceNoteDuration?.inMilliseconds,
+      'customReminderTimes':
+          customReminderTimes?.map((d) => d.inMilliseconds).toList(),
+      'enableDefaultReminders': enableDefaultReminders,
     };
   }
 
-  // ADDED: Convert Todo to JSON Map for SharedPreferences storage
+  // Convert Todo to JSON Map for SharedPreferences storage
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -52,6 +64,9 @@ class Todo {
       'priority': priority,
       'voiceNotePath': voiceNotePath,
       'voiceNoteDuration': voiceNoteDuration?.inMilliseconds,
+      'customReminderTimes':
+          customReminderTimes?.map((d) => d.inMilliseconds).toList(),
+      'enableDefaultReminders': enableDefaultReminders,
     };
   }
 
@@ -71,10 +86,16 @@ class Todo {
       voiceNoteDuration: map['voiceNoteDuration'] != null
           ? Duration(milliseconds: map['voiceNoteDuration'])
           : null,
+      customReminderTimes: map['customReminderTimes'] != null
+          ? (map['customReminderTimes'] as List)
+              .map((ms) => Duration(milliseconds: ms))
+              .toList()
+          : null,
+      enableDefaultReminders: map['enableDefaultReminders'] ?? true,
     );
   }
 
-  // ADDED: Create Todo from JSON Map for SharedPreferences storage
+  // Create Todo from JSON Map for SharedPreferences storage
   factory Todo.fromJson(Map<String, dynamic> json) {
     return Todo(
       id: json['id'] ?? '',
@@ -90,6 +111,12 @@ class Todo {
       voiceNoteDuration: json['voiceNoteDuration'] != null
           ? Duration(milliseconds: json['voiceNoteDuration'])
           : null,
+      customReminderTimes: json['customReminderTimes'] != null
+          ? (json['customReminderTimes'] as List)
+              .map((ms) => Duration(milliseconds: ms))
+              .toList()
+          : null,
+      enableDefaultReminders: json['enableDefaultReminders'] ?? true,
     );
   }
 
@@ -105,6 +132,8 @@ class Todo {
     String? priority,
     String? voiceNotePath,
     Duration? voiceNoteDuration,
+    List<Duration>? customReminderTimes,
+    bool? enableDefaultReminders,
   }) {
     return Todo(
       id: id ?? this.id,
@@ -117,11 +146,33 @@ class Todo {
       priority: priority ?? this.priority,
       voiceNotePath: voiceNotePath ?? this.voiceNotePath,
       voiceNoteDuration: voiceNoteDuration ?? this.voiceNoteDuration,
+      customReminderTimes: customReminderTimes ?? this.customReminderTimes,
+      enableDefaultReminders:
+          enableDefaultReminders ?? this.enableDefaultReminders,
     );
+  }
+
+  // Helper method to get effective reminder times
+  List<Duration> getEffectiveReminderTimes() {
+    if (customReminderTimes != null && customReminderTimes!.isNotEmpty) {
+      return customReminderTimes!;
+    } else if (enableDefaultReminders) {
+      return [
+        Duration(hours: 24), // 1 day before
+        Duration(hours: 2), // 2 hours before
+        Duration(minutes: 15), // 15 minutes before
+      ];
+    } else {
+      return [];
+    }
   }
 
   // Check if todo has voice note
   bool get hasVoiceNote => voiceNotePath != null && voiceNotePath!.isNotEmpty;
+
+  // Check if todo has custom reminders
+  bool get hasCustomReminders =>
+      customReminderTimes != null && customReminderTimes!.isNotEmpty;
 
   // Get formatted voice note duration
   String get formattedVoiceNoteDuration {
@@ -131,9 +182,26 @@ class Todo {
     return '${minutes}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  // Format reminder times for display
+  String get formattedReminderTimes {
+    final times = getEffectiveReminderTimes();
+    if (times.isEmpty) return 'No reminders';
+
+    return times.map((duration) {
+          if (duration.inDays > 0) {
+            return '${duration.inDays} day${duration.inDays > 1 ? 's' : ''}';
+          } else if (duration.inHours > 0) {
+            return '${duration.inHours} hour${duration.inHours > 1 ? 's' : ''}';
+          } else {
+            return '${duration.inMinutes} minute${duration.inMinutes > 1 ? 's' : ''}';
+          }
+        }).join(', ') +
+        ' before due date';
+  }
+
   @override
   String toString() {
-    return 'Todo{id: $id, title: $title, isCompleted: $isCompleted, hasVoiceNote: $hasVoiceNote}';
+    return 'Todo{id: $id, title: $title, isCompleted: $isCompleted, hasVoiceNote: $hasVoiceNote, hasCustomReminders: $hasCustomReminders}';
   }
 
   @override

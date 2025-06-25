@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:timezone/data/latest.dart' as tz; // Add this import
+import 'package:timezone/timezone.dart' as tz; // Add this import
 import 'providers/todo_provider.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
@@ -8,6 +10,9 @@ import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize timezone data - THIS IS THE FIX
+  tz.initializeTimeZones();
 
   // Initialize notification service
   try {
