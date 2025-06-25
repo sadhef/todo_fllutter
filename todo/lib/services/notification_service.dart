@@ -52,8 +52,7 @@ class NotificationService {
         _isInitialized = true;
         print('✅ Notification service initialized successfully');
 
-        // Send test notification to verify it works
-        await _sendWelcomeNotification();
+        // Welcome notification removed - no longer sending test notification
         return true;
       }
 
@@ -335,43 +334,7 @@ class NotificationService {
     }
   }
 
-  /// Send welcome notification
-  Future<void> _sendWelcomeNotification() async {
-    try {
-      const androidDetails = AndroidNotificationDetails(
-        'todo_reminders',
-        'Todo Reminders',
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
-        icon: '@mipmap/ic_launcher',
-        color: Color(0xFFE91E63),
-        timeoutAfter: 5000,
-      );
-
-      const iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: false,
-        presentSound: false,
-      );
-
-      const platformDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      await _flutterLocalNotificationsPlugin.show(
-        99999,
-        '✅ Re-Todo Ready!',
-        'Notifications are working perfectly!',
-        platformDetails,
-        payload: 'welcome',
-      );
-    } catch (e) {
-      print('❌ Error sending welcome notification: $e');
-    }
-  }
-
-  /// Send test notification
+  /// Send test notification (for manual testing only)
   Future<void> showTestNotification() async {
     if (!_isInitialized) await initialize();
 
