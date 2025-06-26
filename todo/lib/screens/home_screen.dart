@@ -7,7 +7,7 @@ import '../widgets/search_bar_widget.dart';
 import '../widgets/stats_card.dart';
 import '../screens/add_todo_screen.dart';
 import '../screens/timeline_screen.dart';
-import '../screens/chatbot_screen.dart'; // NEW: Add ChatBot Screen import
+import '../screens/chatbot_screen.dart';
 import '../theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -118,15 +118,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   CircularProgressIndicator(
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'Loading your todos...',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.primaryColor,
-                        ),
+                      color: AppTheme.primaryColor,
+                    ),
                   ),
                 ],
               ),
@@ -195,17 +194,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Text(
               'Oops! Something went wrong',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: AppTheme.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               todoProvider.error ?? 'Unknown error occurred',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+                color: Colors.grey[600],
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -419,8 +418,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         break;
       default:
         message = 'No todos yet';
-        submessage =
-            'Create your first todo to get started on your productivity journey!';
+        submessage = 'Create your first todo to get started on your productivity journey!';
         icon = Icons.add_task;
         iconColor = AppTheme.accentColor;
     }
@@ -459,17 +457,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Text(
               message,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: AppTheme.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               submessage,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+                color: Colors.grey[600],
+              ),
               textAlign: TextAlign.center,
             ),
             if (filter == 'all') ...[
@@ -493,12 +491,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // NEW: Updated Floating Action Button with ChatBot
   Widget _buildFloatingActionButton() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        // NEW: ChatBot FAB
         FloatingActionButton(
           heroTag: "chatbot_fab",
           mini: true,
@@ -509,10 +505,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           },
           backgroundColor: Colors.orange,
           child: const Text('🍪', style: TextStyle(fontSize: 16)),
-          tooltip: 'Chat with Cookie',
+          tooltip: 'Chat with Cookie 🎀',
         ),
         const SizedBox(height: 12),
-        // Original Add Todo FAB
         FloatingActionButton.extended(
           heroTag: "add_todo_fab",
           onPressed: _addNewTodo,
@@ -583,8 +578,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Navigator.of(context).pop();
               _showSnackBar('Todo deleted', AppTheme.errorColor);
             },
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],

@@ -24,7 +24,7 @@ class ChatBotProvider with ChangeNotifier {
   void _addWelcomeMessage() {
     final welcomeMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      content: """Hi there! 🍪 I'm Cookie, your versatile AI assistant!
+      content: """Hi there!  I'm Cookie 🎀, your versatile AI assistant!
 
 I can help you with:
 • 📝 **Task Management** - Analyze your todos, suggest priorities, boost productivity

@@ -61,7 +61,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Cookie',
+                  const Text('Cookie 🎀',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   Text('AI Assistant & Task Helper',
@@ -77,7 +77,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
             icon: const Icon(Icons.help_outline),
             onPressed: () =>
                 context.read<ChatBotProvider>().sendQuickAction('general_help'),
-            tooltip: 'How to use Cookie',
+            tooltip: 'How to use Cookie 🎀',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -283,7 +283,7 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Cookie is thinking'),
+                const Text('Cookie 🎀 is thinking'),
                 const SizedBox(width: 8),
                 SizedBox(
                   width: 20,
@@ -326,7 +326,8 @@ class _ChatBotScreenState extends State<ChatBotScreen> {
               child: TextField(
                 controller: _messageController,
                 decoration: const InputDecoration(
-                  hintText: 'Ask Cookie anything - tasks, questions, ideas...',
+                  hintText:
+                      'Ask Cookie 🎀 anything - tasks, questions, ideas...',
                   border: InputBorder.none,
                   contentPadding:
                       EdgeInsets.symmetric(horizontal: 20, vertical: 10),
